@@ -6,7 +6,7 @@
 
       module ice_restoring
 
-      use ice_arrays_column, only:ffracn,dhsn
+      use ice_arrays_column, only:ffracn,dhsn,oceanmixed_ice
       use ice_kinds_mod
       use ice_blocks, only: nx_block, ny_block
       use ice_constants, only: c0, c1, c2, p2, p5, c4
@@ -17,9 +17,9 @@
               swvdr,swvdf,swidr,swidf,strocnyT_iavg,strocnxT_iavg,&
               scale_factor,frz_onset,fsnow,frzmlt, sst
       use ice_forcing, only: trestore, trest, get_forcing_bry,&
-              aicen_bry, vicen_bry, vsnon_bry,alvln_bry,qsno_bry,ffrac_bry,&
-              Tsfc_bry, Tinz_bry, Sinz_bry, vlvln_bry,FY_bry,dhs_bry,&
-              apondn_bry, hpondn_bry, ipondn_bry,iage_bry,uvel_bry,&
+              aicen_bry, vicen_bry, vsnon_bry,alvl_bry,qsno_bry,ffrac_bry,&
+              Tsfc_bry, Tinz_bry, Sinz_bry, vlvl_bry,FY_bry,dhs_bry,&
+              apnd_bry, hpnd_bry, ipnd_bry,iage_bry,uvel_bry,&
               vvel_bry,scale_factor_bry,swvdr_bry,swvdf_bry,swidr_bry,swidf_bry,&
               strocnxT_bry,strocnyT_bry,stressp_1_bry,stressp_2_bry,&
               stressp_3_bry,stressp_4_bry,stressm_1_bry,&
@@ -357,7 +357,7 @@
       use ice_grid, only: tmask, hm
       use ice_flux, only: Tf, Tair, salinz, Tmltz,sss
       use ice_restart_shared, only: restart_ext
-      use icepack_tracers, only: tr_pond_lvl,tr_iage
+      use icepack_tracers, only: tr_pond_lvl,tr_iage,tr_FY,tr_lvl
       use icepack_mushy_physics, only: icepack_enthalpy_mush
       use icepack_parameters, only: dsin0_frazil
 
@@ -487,84 +487,14 @@
 
       if (this_block%iblock == 1) then              ! west edge
          if (trim(ew_boundary_type) /= 'cyclic') then
-             if (bdy_origin=='extern') then ! bdy from file 
-                     do n = 1, ncat
-                     do j = 1, ny_block
-                     do i = 1, ilo
-                        aicen_rest(i,j,n,iblk) = aicen_bry(1,j,n,iblk)
-                        vicen_rest(i,j,n,iblk) = vicen_bry(1,j,n,iblk)
-                        vsnon_rest(i,j,n,iblk) = vsnon_bry(1,j,n,iblk)
-                        if (tr_iage) then
-                           trcrn_rest(i,j,nt_iage,n,iblk) = c0 !set ice age to 0 maybe not needed
-                        endif
-    !Calculate tracers as in assimilation originallt from icepack_therm_shared.F90:
-                        if (calc_Tsfc) then
-                            trcrn_rest(i,j,nt_Tsfc,n,iblk) = &
-                               min(Tsmelt,Tair(i,j,iblk)-Tffresh) !deg C
-                        else    ! Tsfc is not calculated by the ice model
-                            trcrn_rest(i,j,nt_Tsfc,n,iblk) = Tf(i,j,iblk)   ! not used
-                        endif
-                        !if (heat_capacity) then
-                        !-- ice energy --
-                            slope = Tf(i,j,iblk) - trcrn_rest(i,j,nt_Tsfc,n,iblk)
-                            if (ktherm == 2) then
-                            ! mushy thermodynamics
-                             if (sss(i,j,iblk) > c2 * dSin0_frazil) then
-                              Si0new = sss(i,j,iblk) - dSin0_frazil
-                             else
-                              Si0new = sss(i,j,iblk)**2 / (c4*dSin0_frazil)
-                             endif
-                             do k = 1, nilyr
-                                 Ti = trcrn_rest(i,j,nt_Tsfc,n,iblk)           &
-                                    + slope*(real(k,kind=dbl_kind)-p5)    &
-                                    /real(nilyr,kind=dbl_kind)
-                                 trcrn_rest(i,j,nt_qice+k-1,n,iblk) =          &
-                                       icepack_enthalpy_mush(Ti, Si0new)
-                                 trcrn_rest(i,j,nt_sice+k-1,n,iblk) = Si0new
-                             enddo
-                            else
-                       ! assume linear temp profile and compute enthalpy
-                             do k = 1, nilyr
-                                Ti = trcrn_rest(i,j,nt_Tsfc,n,iblk)               &
-                                   + slope*(real(k,kind=dbl_kind)-p5)        &
-                                   /real(nilyr,kind=dbl_kind)
-
-                                trcrn_rest(i,j,nt_qice+k-1,n,iblk) =              &
-                                   -( rhoi * (cp_ice*(Tmltz(i,j,k,iblk)-Ti)  &
-                                   + Lfresh*(c1-Tmltz(i,j,k,iblk)/Ti)        &
-                                   -  cp_ocn*Tmltz(i,j,k,iblk))              )
-                             enddo
-                            endif
-                    !-- snow energy --
-                            do k = 1, nslyr
-                              Ti = min(c0, trcrn_rest(i,j,nt_Tsfc,n,iblk))
-                              trcrn_rest(i,j,nt_qsno+k-1,n,iblk) =                &
-                                                  -rhos*(Lfresh - cp_ice*Ti)
-                            enddo
-                        !else  ! one layer with zero heat capacity
-                     !-- ice energy --
-                        !    trcrn(i,j,nt_qice,n,iblk)= -rhoi*Lfresh
-                     !-- snow energy --
-                        !    trcrn(i,j,nt_qsno,n,iblk)= -rhos*Lfresh
-                        !endif
-                     enddo
-                     enddo
-                     enddo
-             elseif (bdy_origin=='intern' .or. bdy_origin=='restart_f') then
+             if (bdy_origin=='intern' .or. bdy_origin=='restart_f') then
                      do n = 1, ncat
                      do j = 1, ny_block
                      do i = 1, ilo+nfact
-                        !write(nu_diag,*) 'aicen_bry(1,j,n,iblk): ', aicen_bry(1,j,n,iblk)
-                        !write(nu_diag,*) 'j: ', j
+                        trcrn_rest(i,j,nt_Tsfc,n,iblk) = Tsfc_bry(i,j,n,iblk)
                         aicen_rest(i,j,n,iblk) = aicen_bry(i,j,n,iblk)
                         vicen_rest(i,j,n,iblk) = vicen_bry(i,j,n,iblk)
                         vsnon_rest(i,j,n,iblk) = vsnon_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_FY,n,iblk) = FY_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvln_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_Tsfc,n,iblk) = Tsfc_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_alvl,n,iblk) = alvln_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvln_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_iage,n,iblk) = iage_bry(i,j,n,iblk)
                         do k = 1,nilyr
                             trcrn_rest(i,j,nt_sice+k-1,n,iblk) = Sinz_bry(i,j,k,n,iblk)
                             trcrn_rest(i,j,nt_qice+k-1,n,iblk) = Tinz_bry(i,j,k,n,iblk)
@@ -572,23 +502,65 @@
                         do k = 1,nslyr
                             trcrn_rest(i,j,nt_qsno+k-1,n,iblk) = qsno_bry(i,j,k,n,iblk)
                         enddo
-                        dhs_rest(i,j,n,iblk) = dhs_bry(i,j,n,iblk)
-                        ffrac_rest(i,j,n,iblk) = ffrac_bry(i,j,n,iblk)
-
                      enddo
                      enddo
                      enddo
                    if (tr_pond_lvl) then ! bdy from file
-                    do n = 1, ncat
-                    do j = 1, ny_block
-                    do i = 1, ilo+nfact
-                       trcrn_rest(i,j,nt_apnd,n,iblk) = apondn_bry(i,j,n,iblk)
-                       trcrn_rest(i,j,nt_ipnd,n,iblk) = ipondn_bry(i,j,n,iblk)
-                       trcrn_rest(i,j,nt_hpnd,n,iblk) = hpondn_bry(i,j,n,iblk)
-                    enddo
-                    enddo
-                    enddo
-                   endif
+                   do i = 1, ilo+nfact
+                   do j = 1, ny_block
+                       fsnow_rest(i,j,iblk) = fsnow_bry(i,j,iblk)
+                       do n = 1, ncat
+                           trcrn_rest(i,j,nt_apnd,n,iblk) = apnd_bry(i,j,n,iblk)
+                           trcrn_rest(i,j,nt_ipnd,n,iblk) = ipnd_bry(i,j,n,iblk)
+                           trcrn_rest(i,j,nt_hpnd,n,iblk) = hpnd_bry(i,j,n,iblk)
+                           dhs_rest(i,j,n,iblk) = dhs_bry(i,j,n,iblk)
+                           ffrac_rest(i,j,n,iblk) = ffrac_bry(i,j,n,iblk)
+                       enddo
+                   enddo
+                   enddo
+                   endif !tr_pond_lvl
+
+                   if (oceanmixed_ice) then
+                   do j = 1, ny_block
+                   do i = 1, ilo+nfact
+                      frzmelt_rest(i,j,iblk) = frzmelt_bry(i,j,iblk)
+                      sst_rest(i,j,iblk) = sst_bry(i,j,iblk)
+                   enddo
+                   enddo
+                   endif !oceanmixed_ice
+                   
+                   if (tr_FY) then
+                   do j = 1, ny_block
+                   do i = 1, ilo+nfact
+                       frz_onset_rest(i,j,iblk) = frz_onset_bry(i,j,iblk)
+                       do n = 1, ncat
+                           trcrn_rest(i,j,nt_FY,n,iblk) = FY_bry(i,j,n,iblk)
+                       enddo
+                   enddo
+                   enddo
+                   endif !tr_FY
+
+                   if (tr_lvl) then
+                   do j = 1, ny_block
+                   do i = 1, ilo+nfact
+                   do n = 1, ncat
+                       trcrn_rest(i,j,nt_alvl,n,iblk) = alvl_bry(i,j,n,iblk)
+                       trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvl_bry(i,j,n,iblk)
+                   enddo
+                   enddo
+                   enddo
+                   endif !tr_lvl
+
+                   if (tr_iage) then
+                   do j = 1, ny_block
+                   do i = 1, ilo+nfact
+                   do n = 1, ncat
+                      trcrn_rest(i,j,nt_iage,n,iblk) = iage_bry(i,j,n,iblk)
+                   enddo
+                   enddo
+                   enddo
+                   endif !tr_iage
+
                    do j = 1, ny_block
                    do i = 1, ilo+nfact
                       uvel_rest(i,j,iblk) = uvel_bry(i,j,iblk)
@@ -613,10 +585,6 @@
                       stress12_3_rest(i,j,iblk) = stress12_3_bry(i,j,iblk)
                       stress12_4_rest(i,j,iblk) = stress12_4_bry(i,j,iblk)
                       iceumask_rest(i,j,iblk) = iceumask_bry(i,j,iblk)
-                      frz_onset_rest(i,j,iblk) = frz_onset_bry(i,j,iblk)
-                      fsnow_rest(i,j,iblk) = fsnow_bry(i,j,iblk)
-                      frzmelt_rest(i,j,iblk) = frzmelt_bry(i,j,iblk)
-                      sst_rest(i,j,iblk) = sst_bry(i,j,iblk)
                    enddo
                    enddo
              else
@@ -642,82 +610,14 @@
                endif
                if (npad /= 0) ibc = ibc - 1
             enddo
-             if ((sea_ice_time_bry) .and. (bdy_origin=='extern')) then ! bdy from file
-                     do n = 1, ncat
-                     do j = 1, ny_block
-                     do i = ihi, ibc
-                        aicen_rest(i,j,n,iblk) = aicen_bry(ibc,j,n,iblk)
-                        vicen_rest(i,j,n,iblk) = vicen_bry(ibc,j,n,iblk)
-                        vsnon_rest(i,j,n,iblk) = vsnon_bry(ibc,j,n,iblk)
-                        if (tr_iage) then
-                           trcrn_rest(i,j,nt_iage,n,iblk) = c0 !set ice age to 0 maybe not needed
-                        endif
-    !Calculate tracers as in assimilation originallt from icepack_therm_shared.F90:
-                        if (calc_Tsfc) then
-                            trcrn_rest(i,j,nt_Tsfc,n,iblk) = &
-                               min(Tsmelt,Tair(i,j,iblk)-Tffresh) !deg C
-                        else    ! Tsfc is not calculated by the ice model
-                            trcrn_rest(i,j,nt_Tsfc,n,iblk) = Tf(i,j,iblk)   ! not used
-                        endif
-                        !if (heat_capacity) then
-                        !-- ice energy --
-                            slope = Tf(i,j,iblk) - trcrn_rest(i,j,nt_Tsfc,n,iblk)
-                            if (ktherm == 2) then
-                            ! mushy thermodynamics
-                             if (sss(i,j,iblk) > c2 * dSin0_frazil) then
-                              Si0new = sss(i,j,iblk) - dSin0_frazil
-                             else
-                              Si0new = sss(i,j,iblk)**2 / (c4*dSin0_frazil)
-                             endif
-                             do k = 1, nilyr
-                                 Ti = trcrn_rest(i,j,nt_Tsfc,n,iblk)           &
-                                    + slope*(real(k,kind=dbl_kind)-p5)    &
-                                    /real(nilyr,kind=dbl_kind)
-                                 trcrn_rest(i,j,nt_qice+k-1,n,iblk) =          &
-                                       icepack_enthalpy_mush(Ti, Si0new)
-                                 trcrn_rest(i,j,nt_sice+k-1,n,iblk) = Si0new
-                             enddo
-                            else
-                       ! assume linear temp profile and compute enthalpy
-                             do k = 1, nilyr
-                                Ti = trcrn_rest(i,j,nt_Tsfc,n,iblk)               &
-                                   + slope*(real(k,kind=dbl_kind)-p5)        &
-                                   /real(nilyr,kind=dbl_kind)
-
-                                trcrn_rest(i,j,nt_qice+k-1,n,iblk) =              &
-                                   -( rhoi * (cp_ice*(Tmltz(i,j,k,iblk)-Ti)  &
-                                   + Lfresh*(c1-Tmltz(i,j,k,iblk)/Ti)        &
-                                   -  cp_ocn*Tmltz(i,j,k,iblk))              )
-                             enddo
-                            endif
-                    !-- snow energy --
-                            do k = 1, nslyr
-                              Ti = min(c0, trcrn_rest(i,j,nt_Tsfc,n,iblk))
-                              trcrn_rest(i,j,nt_qsno+k-1,n,iblk) =                &
-                                                  -rhos*(Lfresh - cp_ice*Ti)
-                            enddo
-                        !else  ! one layer with zero heat capacity
-                     !-- ice energy --
-                        !    trcrn(i,j,nt_qice,n,iblk)= -rhoi*Lfresh
-                     !-- snow energy --
-                        !    trcrn(i,j,nt_qsno,n,iblk)= -rhos*Lfresh
-                        !endif
-                     enddo
-                     enddo
-                     enddo
-             elseif ((sea_ice_time_bry) .and. (bdy_origin=='intern' .or. bdy_origin=='restart_f')) then
+             if ((bdy_origin=='intern' .or. bdy_origin=='restart_f')) then
                      do n = 1, ncat
                      do j = 1, ny_block
                      do i = ihi-nfact, ibc
                         aicen_rest(i,j,n,iblk) = aicen_bry(i,j,n,iblk)
                         vicen_rest(i,j,n,iblk) = vicen_bry(i,j,n,iblk)
                         vsnon_rest(i,j,n,iblk) = vsnon_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_FY,n,iblk) = FY_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvln_bry(i,j,n,iblk)
                         trcrn_rest(i,j,nt_Tsfc,n,iblk) = Tsfc_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_alvl,n,iblk) = alvln_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvln_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_iage,n,iblk) = iage_bry(i,j,n,iblk)
                         do k = 1,nilyr
                             trcrn_rest(i,j,nt_sice+k-1,n,iblk) = Sinz_bry(i,j,k,n,iblk)
                             trcrn_rest(i,j,nt_qice+k-1,n,iblk) = Tinz_bry(i,j,k,n,iblk)
@@ -725,22 +625,65 @@
                         do k = 1,nslyr
                             trcrn_rest(i,j,nt_qsno+k-1,n,iblk) = qsno_bry(i,j,k,n,iblk)
                         enddo
-                        dhs_rest(i,j,n,iblk) = dhs_bry(i,j,n,iblk)
-                        ffrac_rest(i,j,n,iblk) = ffrac_bry(i,j,n,iblk)
                      enddo
                      enddo
                      enddo
                    if (tr_pond_lvl) then ! bdy from file
-                    do n = 1, ncat
                     do j = 1, ny_block
                     do i = ihi-nfact, ibc
-                       trcrn_rest(i,j,nt_apnd,n,iblk) = apondn_bry(i,j,n,iblk)
-                       trcrn_rest(i,j,nt_ipnd,n,iblk) = ipondn_bry(i,j,n,iblk)
-                       trcrn_rest(i,j,nt_hpnd,n,iblk) = hpondn_bry(i,j,n,iblk)
+                      fsnow_rest(i,j,iblk) = fsnow_bry(i,j,iblk)
+                      do n = 1, ncat
+                       trcrn_rest(i,j,nt_apnd,n,iblk) = apnd_bry(i,j,n,iblk)
+                       trcrn_rest(i,j,nt_ipnd,n,iblk) = ipnd_bry(i,j,n,iblk)
+                       trcrn_rest(i,j,nt_hpnd,n,iblk) = hpnd_bry(i,j,n,iblk)
+                       dhs_rest(i,j,n,iblk) = dhs_bry(i,j,n,iblk)
+                       ffrac_rest(i,j,n,iblk) = ffrac_bry(i,j,n,iblk)
+                      enddo
                     enddo
                     enddo
-                    enddo
-                   endif
+                   endif !tr_pond_lvl
+
+                   if (oceanmixed_ice) then
+                   do j = 1, ny_block
+                   do i = ihi-nfact, ibc
+                      frzmelt_rest(i,j,iblk) = frzmelt_bry(i,j,iblk)
+                      sst_rest(i,j,iblk) = sst_bry(i,j,iblk)
+                   enddo
+                   enddo
+                   endif !oceanmixed_ice
+
+                   if (tr_FY) then
+                   do j = 1, ny_block
+                   do i = ihi-nfact, ibc
+                       frz_onset_rest(i,j,iblk) = frz_onset_bry(i,j,iblk)
+                       do n = 1, ncat
+                           trcrn_rest(i,j,nt_FY,n,iblk) = FY_bry(i,j,n,iblk)
+                       enddo
+                   enddo
+                   enddo
+                   endif !tr_FY
+
+                   if (tr_lvl) then
+                   do j = 1, ny_block
+                   do i = ihi-nfact, ibc
+                   do n = 1, ncat
+                       trcrn_rest(i,j,nt_alvl,n,iblk) = alvl_bry(i,j,n,iblk)
+                       trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvl_bry(i,j,n,iblk)
+                   enddo
+                   enddo
+                   enddo
+                   endif !tr_lvl
+
+                   if (tr_iage) then
+                   do j = 1, ny_block
+                   do i = ihi-nfact, ibc
+                   do n = 1, ncat
+                      trcrn_rest(i,j,nt_iage,n,iblk) = iage_bry(i,j,n,iblk)
+                   enddo
+                   enddo
+                   enddo
+                   endif !tr_iage
+
                    do j = 1, ny_block
                    do i = ihi-nfact, ibc
                       uvel_rest(i,j,iblk) = uvel_bry(i,j,iblk)
@@ -765,10 +708,6 @@
                       stress12_3_rest(i,j,iblk) = stress12_3_bry(i,j,iblk)
                       stress12_4_rest(i,j,iblk) = stress12_4_bry(i,j,iblk)
                       iceumask_rest(i,j,iblk) = iceumask_bry(i,j,iblk)
-                      frz_onset_rest(i,j,iblk) = frz_onset_bry(i,j,iblk)
-                      fsnow_rest(i,j,iblk) = fsnow_bry(i,j,iblk)
-                      frzmelt_rest(i,j,iblk) = frzmelt_bry(i,j,iblk)
-                      sst_rest(i,j,iblk) = sst_bry(i,j,iblk)
                    enddo
                    enddo
              else
@@ -781,76 +720,14 @@
 
       if (this_block%jblock == 1) then              ! south edge
          if (trim(ns_boundary_type) /= 'cyclic') then
-             if ((sea_ice_time_bry) .and. (bdy_origin=='extern')) then ! bdy from file
-                    do n = 1, ncat
-                    do j = 1, jlo
-                    do i = 1, nx_block
-                        aicen_rest(i,j,n,iblk) = aicen_bry(i,1,n,iblk)
-                        vicen_rest(i,j,n,iblk) = vicen_bry(i,1,n,iblk)
-                        vsnon_rest(i,j,n,iblk) = vsnon_bry(i,1,n,iblk)
-                        if (tr_iage) then
-                           trcrn_rest(i,j,nt_iage,n,iblk) = c0 !set ice age to 0 maybe not needed
-                        endif
-    !Calculate tracers as in assimilation originallt from icepack_therm_shared.F90:
-                        if (calc_Tsfc) then
-                            trcrn_rest(i,j,nt_Tsfc,n,iblk) = &
-                               min(Tsmelt,Tair(i,j,iblk)-Tffresh) !deg C
-                        else    ! Tsfc is not calculated by the ice model
-                            trcrn_rest(i,j,nt_Tsfc,n,iblk) = Tf(i,j,iblk)   ! not used
-                        endif
-                        !if (heat_capacity) then
-                        !-- ice energy --
-                            slope = Tf(i,j,iblk) - trcrn_rest(i,j,nt_Tsfc,n,iblk)
-                            if (ktherm == 2) then
-                            ! mushy thermodynamics
-                             if (sss(i,j,iblk) > c2 * dSin0_frazil) then
-                              Si0new = sss(i,j,iblk) - dSin0_frazil
-                             else
-                              Si0new = sss(i,j,iblk)**2 / (c4*dSin0_frazil)
-                             endif
-                             do k = 1, nilyr
-                                 Ti = trcrn_rest(i,j,nt_Tsfc,n,iblk)           &
-                                    + slope*(real(k,kind=dbl_kind)-p5)    &
-                                    /real(nilyr,kind=dbl_kind)
-                                 trcrn_rest(i,j,nt_qice+k-1,n,iblk) =          &
-                                       icepack_enthalpy_mush(Ti, Si0new)
-                                 trcrn_rest(i,j,nt_sice+k-1,n,iblk) = Si0new
-                             enddo
-                            else
-                       ! assume linear temp profile and compute enthalpy
-                             do k = 1, nilyr
-                                Ti = trcrn_rest(i,j,nt_Tsfc,n,iblk)               &
-                                   + slope*(real(k,kind=dbl_kind)-p5)        &
-                                   /real(nilyr,kind=dbl_kind)
-
-                                trcrn_rest(i,j,nt_qice+k-1,n,iblk) =              &
-                                   -( rhoi * (cp_ice*(Tmltz(i,j,k,iblk)-Ti)  &
-                                   + Lfresh*(c1-Tmltz(i,j,k,iblk)/Ti)        &
-                                   -  cp_ocn*Tmltz(i,j,k,iblk))              )
-                             enddo
-                            endif
-                    !-- snow energy --
-                            do k = 1, nslyr
-                              Ti = min(c0, trcrn_rest(i,j,nt_Tsfc,n,iblk))
-                              trcrn_rest(i,j,nt_qsno+k-1,n,iblk) =                &
-                                                  -rhos*(Lfresh - cp_ice*Ti)
-                            enddo
-                     enddo
-                     enddo
-                     enddo
-             elseif ((sea_ice_time_bry) .and. (bdy_origin=='intern' .or. bdy_origin=='restart_f')) then
+             if ((bdy_origin=='intern' .or. bdy_origin=='restart_f')) then
                     do n = 1, ncat
                     do j = 1, jlo+nfact
                     do i = 1, nx_block
                         aicen_rest(i,j,n,iblk) = aicen_bry(i,j,n,iblk)
                         vicen_rest(i,j,n,iblk) = vicen_bry(i,j,n,iblk)
                         vsnon_rest(i,j,n,iblk) = vsnon_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvln_bry(i,j,n,iblk)
                         trcrn_rest(i,j,nt_Tsfc,n,iblk) = Tsfc_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_alvl,n,iblk) = alvln_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvln_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_iage,n,iblk) = iage_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_FY,n,iblk) = FY_bry(i,j,n,iblk)
                         do k = 1,nilyr
                             trcrn_rest(i,j,nt_sice+k-1,n,iblk) = Sinz_bry(i,j,k,n,iblk)
                             trcrn_rest(i,j,nt_qice+k-1,n,iblk) = Tinz_bry(i,j,k,n,iblk)
@@ -858,22 +735,65 @@
                         do k = 1,nslyr
                             trcrn_rest(i,j,nt_qsno+k-1,n,iblk) = qsno_bry(i,j,k,n,iblk)
                         enddo
-                        dhs_rest(i,j,n,iblk) = dhs_bry(i,j,n,iblk)
-                        ffrac_rest(i,j,n,iblk) = ffrac_bry(i,j,n,iblk)
                      enddo
                      enddo
                      enddo
                    if (tr_pond_lvl) then ! bdy from file
-                    do n = 1, ncat
-                    do j = 1, jlo+nfact
-                    do i = 1, nx_block
-                       trcrn_rest(i,j,nt_apnd,n,iblk) = apondn_bry(i,j,n,iblk)
-                       trcrn_rest(i,j,nt_ipnd,n,iblk) = ipondn_bry(i,j,n,iblk)
-                       trcrn_rest(i,j,nt_hpnd,n,iblk) = hpondn_bry(i,j,n,iblk)
-                    enddo
-                    enddo
-                    enddo
-                   endif
+                   do j = 1, jlo+nfact
+                   do i = 1, nx_block
+                      fsnow_rest(i,j,iblk) = fsnow_bry(i,j,iblk)
+                      do n = 1, ncat
+                       trcrn_rest(i,j,nt_apnd,n,iblk) = apnd_bry(i,j,n,iblk)
+                       trcrn_rest(i,j,nt_ipnd,n,iblk) = ipnd_bry(i,j,n,iblk)
+                       trcrn_rest(i,j,nt_hpnd,n,iblk) = hpnd_bry(i,j,n,iblk)
+                       dhs_rest(i,j,n,iblk) = dhs_bry(i,j,n,iblk)
+                       ffrac_rest(i,j,n,iblk) = ffrac_bry(i,j,n,iblk)
+                      enddo
+                   enddo
+                   enddo
+                   endif ! tr_pond_lvl
+
+                   if (oceanmixed_ice) then
+                   do j = 1, jlo+nfact
+                   do i = 1, nx_block
+                      frzmelt_rest(i,j,iblk) = frzmelt_bry(i,j,iblk)
+                      sst_rest(i,j,iblk) = sst_bry(i,j,iblk)
+                   enddo
+                   enddo
+                   endif !oceanmixed_ice
+
+                   if (tr_FY) then
+                   do j = 1, jlo+nfact
+                   do i = 1, nx_block
+                       frz_onset_rest(i,j,iblk) = frz_onset_bry(i,j,iblk)
+                       do n = 1, ncat
+                           trcrn_rest(i,j,nt_FY,n,iblk) = FY_bry(i,j,n,iblk)
+                       enddo
+                   enddo
+                   enddo
+                   endif !tr_FY
+
+                   if (tr_lvl) then
+                   do j = 1, jlo+nfact
+                   do i = 1, nx_block
+                   do n = 1, ncat
+                       trcrn_rest(i,j,nt_alvl,n,iblk) = alvl_bry(i,j,n,iblk)
+                       trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvl_bry(i,j,n,iblk)
+                   enddo
+                   enddo
+                   enddo
+                   endif !tr_lvl
+
+                   if (tr_iage) then
+                   do j = 1, jlo+nfact
+                   do i = 1, nx_block
+                   do n = 1, ncat
+                      trcrn_rest(i,j,nt_iage,n,iblk) = iage_bry(i,j,n,iblk)
+                   enddo
+                   enddo
+                   enddo
+                   endif !tr_iage
+
                    do j = 1, jlo+nfact
                    do i = 1, nx_block
                       uvel_rest(i,j,iblk) = uvel_bry(i,j,iblk)
@@ -898,10 +818,6 @@
                       stress12_3_rest(i,j,iblk) = stress12_3_bry(i,j,iblk)
                       stress12_4_rest(i,j,iblk) = stress12_4_bry(i,j,iblk)
                       iceumask_rest(i,j,iblk) = iceumask_bry(i,j,iblk)
-                      frz_onset_rest(i,j,iblk) = frz_onset_bry(i,j,iblk)
-                      fsnow_rest(i,j,iblk) = fsnow_bry(i,j,iblk)
-                      frzmelt_rest(i,j,iblk) = frzmelt_bry(i,j,iblk)
-                      sst_rest(i,j,iblk) = sst_bry(i,j,iblk)
                    enddo
                    enddo
              else
@@ -927,82 +843,14 @@
                endif
                if (npad /= 0) ibc = ibc - 1
             enddo
-            if ((sea_ice_time_bry) .and. (bdy_origin=='extern')) then ! bdy from file
-                    do n = 1, ncat
-                    do j = jhi, ibc
-                    do i = 1, nx_block
-                        aicen_rest(i,j,n,iblk) = aicen_bry(i,ibc,n,iblk)
-                        vicen_rest(i,j,n,iblk) = vicen_bry(i,ibc,n,iblk)
-                        vsnon_rest(i,j,n,iblk) = vsnon_bry(i,ibc,n,iblk)
-                        if (tr_iage) then
-                           trcrn_rest(i,j,nt_iage,n,iblk) = c0 !set ice age to 0 maybe not needed
-                        endif
-    !Calculate tracers as in assimilation originallt from icepack_therm_shared.F90:
-                        if (calc_Tsfc) then
-                            trcrn_rest(i,j,nt_Tsfc,n,iblk) = &
-                               min(Tsmelt,Tair(i,j,iblk)-Tffresh) !deg C
-                        else    ! Tsfc is not calculated by the ice model
-                            trcrn_rest(i,j,nt_Tsfc,n,iblk) = Tf(i,j,iblk)   ! not used
-                        endif
-                        !if (heat_capacity) then
-                        !-- ice energy --
-                            slope = Tf(i,j,iblk) - trcrn_rest(i,j,nt_Tsfc,n,iblk)
-                            if (ktherm == 2) then
-                            ! mushy thermodynamics
-                             if (sss(i,j,iblk) > c2 * dSin0_frazil) then
-                              Si0new = sss(i,j,iblk) - dSin0_frazil
-                             else
-                              Si0new = sss(i,j,iblk)**2 / (c4*dSin0_frazil)
-                             endif
-                             do k = 1, nilyr
-                                 Ti = trcrn_rest(i,j,nt_Tsfc,n,iblk)           &
-                                    + slope*(real(k,kind=dbl_kind)-p5)    &
-                                    /real(nilyr,kind=dbl_kind)
-                                 trcrn_rest(i,j,nt_qice+k-1,n,iblk) =          &
-                                       icepack_enthalpy_mush(Ti, Si0new)
-                                 trcrn_rest(i,j,nt_sice+k-1,n,iblk) = Si0new
-                             enddo
-                            else
-                       ! assume linear temp profile and compute enthalpy
-                             do k = 1, nilyr
-                                Ti = trcrn_rest(i,j,nt_Tsfc,n,iblk)               &
-                                   + slope*(real(k,kind=dbl_kind)-p5)        &
-                                   /real(nilyr,kind=dbl_kind)
-
-                                trcrn_rest(i,j,nt_qice+k-1,n,iblk) =              &
-                                   -( rhoi * (cp_ice*(Tmltz(i,j,k,iblk)-Ti)  &
-                                   + Lfresh*(c1-Tmltz(i,j,k,iblk)/Ti)        &
-                                   -  cp_ocn*Tmltz(i,j,k,iblk))              )
-                             enddo
-                            endif
-                    !-- snow energy --
-                            do k = 1, nslyr
-                              Ti = min(c0, trcrn_rest(i,j,nt_Tsfc,n,iblk))
-                              trcrn_rest(i,j,nt_qsno+k-1,n,iblk) =                &
-                                                  -rhos*(Lfresh - cp_ice*Ti)
-                            enddo
-                        !else  ! one layer with zero heat capacity
-                     !-- ice energy --
-                         !   trcrn(i,j,nt_qice,n,iblk)= -rhoi*Lfresh
-                     !-- snow energy --
-                         !   trcrn(i,j,nt_qsno,n,iblk)= -rhos*Lfresh
-                        !endif
-                     enddo
-                     enddo
-                     enddo
-             elseif ((sea_ice_time_bry) .and. (bdy_origin=='intern' .or. bdy_origin=='restart_f')) then
+             if ((bdy_origin=='intern' .or. bdy_origin=='restart_f')) then
                     do n = 1, ncat
                     do j = jhi-nfact, ibc
                     do i = 1, nx_block
                         aicen_rest(i,j,n,iblk) = aicen_bry(i,j,n,iblk)
                         vicen_rest(i,j,n,iblk) = vicen_bry(i,j,n,iblk)
                         vsnon_rest(i,j,n,iblk) = vsnon_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvln_bry(i,j,n,iblk)
                         trcrn_rest(i,j,nt_Tsfc,n,iblk) = Tsfc_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_alvl,n,iblk) = alvln_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvln_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_iage,n,iblk) = iage_bry(i,j,n,iblk)
-                        trcrn_rest(i,j,nt_FY,n,iblk) = FY_bry(i,j,n,iblk)
                         do k = 1,nilyr
                             trcrn_rest(i,j,nt_sice+k-1,n,iblk) = Sinz_bry(i,j,k,n,iblk)
                             trcrn_rest(i,j,nt_qice+k-1,n,iblk) = Tinz_bry(i,j,k,n,iblk)
@@ -1010,22 +858,65 @@
                         do k = 1,nslyr
                             trcrn_rest(i,j,nt_qsno+k-1,n,iblk) = qsno_bry(i,j,k,n,iblk)
                         enddo
-                        dhs_rest(i,j,n,iblk) = dhs_bry(i,j,n,iblk)
-                        ffrac_rest(i,j,n,iblk) = ffrac_bry(i,j,n,iblk)
                      enddo
                      enddo
                      enddo
                    if (tr_pond_lvl) then ! bdy from file
-                    do n = 1, ncat
                     do j = jhi-nfact, ibc
                     do i = 1, nx_block
-                       trcrn_rest(i,j,nt_apnd,n,iblk) = apondn_bry(i,j,n,iblk)
-                       trcrn_rest(i,j,nt_ipnd,n,iblk) = ipondn_bry(i,j,n,iblk)
-                       trcrn_rest(i,j,nt_hpnd,n,iblk) = hpondn_bry(i,j,n,iblk)
+                      fsnow_rest(i,j,iblk) = fsnow_bry(i,j,iblk)
+                      do n = 1, ncat
+                       trcrn_rest(i,j,nt_apnd,n,iblk) = apnd_bry(i,j,n,iblk)
+                       trcrn_rest(i,j,nt_ipnd,n,iblk) = ipnd_bry(i,j,n,iblk)
+                       trcrn_rest(i,j,nt_hpnd,n,iblk) = hpnd_bry(i,j,n,iblk)
+                       dhs_rest(i,j,n,iblk) = dhs_bry(i,j,n,iblk)
+                       ffrac_rest(i,j,n,iblk) = ffrac_bry(i,j,n,iblk)
+                      enddo
                     enddo
                     enddo
-                    enddo
-                   endif
+                   endif !tr_pond_lvl
+
+                   if (oceanmixed_ice) then
+                   do j = jhi-nfact, ibc
+                   do i = 1, nx_block
+                      frzmelt_rest(i,j,iblk) = frzmelt_bry(i,j,iblk)
+                      sst_rest(i,j,iblk) = sst_bry(i,j,iblk)
+                   enddo
+                   enddo
+                   endif !oceanmixed_ice
+
+                   if (tr_FY) then
+                   do j = jhi-nfact, ibc
+                   do i = 1, nx_block
+                       frz_onset_rest(i,j,iblk) = frz_onset_bry(i,j,iblk)
+                       do n = 1, ncat
+                           trcrn_rest(i,j,nt_FY,n,iblk) = FY_bry(i,j,n,iblk)
+                       enddo
+                   enddo
+                   enddo
+                   endif !tr_FY
+
+                   if (tr_lvl) then
+                   do j = jhi-nfact, ibc
+                   do i = 1, nx_block
+                   do n = 1, ncat
+                       trcrn_rest(i,j,nt_alvl,n,iblk) = alvl_bry(i,j,n,iblk)
+                       trcrn_rest(i,j,nt_vlvl,n,iblk) = vlvl_bry(i,j,n,iblk)
+                   enddo
+                   enddo
+                   enddo
+                   endif !tr_lvl
+
+                   if (tr_iage) then
+                   do j = jhi-nfact, ibc
+                   do i = 1, nx_block
+                   do n = 1, ncat
+                      trcrn_rest(i,j,nt_iage,n,iblk) = iage_bry(i,j,n,iblk)
+                   enddo
+                   enddo
+                   enddo
+                   endif !tr_iage
+
                    do j = jhi-nfact, ibc
                    do i = 1, nx_block
                       uvel_rest(i,j,iblk) = uvel_bry(i,j,iblk)
@@ -1050,10 +941,6 @@
                       stress12_3_rest(i,j,iblk) = stress12_3_bry(i,j,iblk)
                       stress12_4_rest(i,j,iblk) = stress12_4_bry(i,j,iblk)
                       iceumask_rest(i,j,iblk) = iceumask_bry(i,j,iblk)
-                      frz_onset_rest(i,j,iblk) = frz_onset_bry(i,j,iblk)
-                      fsnow_rest(i,j,iblk) = fsnow_bry(i,j,iblk)
-                      frzmelt_rest(i,j,iblk) = frzmelt_bry(i,j,iblk)
-                      sst_rest(i,j,iblk) = sst_bry(i,j,iblk)
                    enddo
                    enddo
              else
@@ -1305,7 +1192,6 @@ end subroutine ice_HaloRestore_getbdy
                                       Sprofile=salinz(i,j,:),         &
                                       Tprofile=Tmltz(i,j,:),          &
                                       Tsfc=Tsfc,                      &
-                                      nilyr=nilyr,       nslyr=nslyr, &
                                       qin=qin(:),        qsn=qsn(:))
 
                ! surface temperature
@@ -1395,330 +1281,13 @@ end subroutine ice_HaloRestore_getbdy
          trest = real(trestore,kind=dbl_kind) * secday ! seconds
       endif
       ctime = dt/trest
-      nfact=0
+      nfact=1
 !-----------------------------------------------------------------------
 !
 !  Restore values in cells surrounding the grid
 !
 !-----------------------------------------------------------------------
-   if ((sea_ice_time_bry) .and. (bdy_origin=='extern')) then
-      call ice_HaloRestore_getbdy
-      call icepack_query_parameters(puny_out=puny)
-   !$OMP PARALLEL DO PRIVATE(iblk,ilo,ihi,jlo,jhi,this_block, &
-   !$OMP                     i,j,n,nt,ibc,npad)
-   do iblk = 1, nblocks
-      this_block = get_block(blocks_ice(iblk),iblk)
-         ilo = this_block%ilo
-         ihi = this_block%ihi
-         jlo = this_block%jlo
-         jhi = this_block%jhi
-
-      if (this_block%iblock == 1) then              ! west edge
-         if (trim(ew_boundary_type) /= 'cyclic') then
-            do n = 1, ncat
-            do j = 1, ny_block
-            do i = 1, ilo
-               aicen(i,j,n,iblk) = aicen_rest(i,j,n,iblk)!aicen(i,j,n,iblk) &
-                  !+ (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
-               vicen(i,j,n,iblk) = vicen_rest(i,j,n,iblk)!vicen(i,j,n,iblk) &
-                  !+ (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
-               vsnon(i,j,n,iblk) = vsnon_rest(i,j,n,iblk)!vsnon(i,j,n,iblk) &
-                  !+ (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
-               do nt = 1, ntrcr
-                  if  (((nt == nt_qice).or. (nt == nt_sice))) then ! not sure this is needed
-                     do k = 1,nilyr
-                        trcrn(i,j,nt+k-1,n,iblk) = &
-                                trcrn_rest(i,j,nt+k-1,n,iblk)
-                              !trcrn(i,j,nt+k-1,n,iblk) &
-                              !+ (trcrn_rest(i,j,nt+k-1,n,iblk)- &
-                              !   trcrn(i,j,nt+k-1,n,iblk)) &
-                              !*ctime
-                     enddo
-                  else if (nt == nt_qsno) then
-                     do k = 1,nslyr
-                        trcrn(i,j,nt+k-1,n,iblk) = &
-                                trcrn_rest(i,j,nt+k-1,n,iblk)
-                              !trcrn(i,j,nt+k-1,n,iblk) &
-                              !+ (trcrn_rest(i,j,nt+k-1,n,iblk)- &
-                              !   trcrn(i,j,nt+k-1,n,iblk)) &
-                              !*ctime
-                     enddo
-                  else
-                     trcrn(i,j,nt,n,iblk) = trcrn_rest(i,j,nt,n,iblk)!trcrn(i,j,nt,n,iblk) &
-                        !+ (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
-                  endif
-               enddo
-            enddo
-            enddo
-            enddo
-            !write (nu_diag,*) ' aicen(1,:,1,1) after=', sum(aicen(1,:,1,1))
-            !write (nu_diag,*) ' aicen_rest(1,:,1,1) after=',sum(aicen_rest(1,:,1,1))
-            do j = 1, ny_block
-            do i = 1, ilo
-               if (aice(ilo+1,j,iblk)>0. .and. aice(i,j,iblk)>0.) then !add veloceties
-                       uvel(i,j,iblk)=uvel(ilo+1,j,iblk)
-                       vvel(i,j,iblk)=vvel(ilo+1,j,iblk)
-               endif
-               if (sum(aicen(i,j,:,iblk))>1.) then !warning
-                       write (nu_diag,*) 'aice>1 at i,j West: ',i,j
-                       write (nu_diag,*) 'sum(aicen_rest(i,j,:,iblk)):',sum(aicen_rest(i,j,:,iblk))
-                       write (nu_diag,*) 'error stopping model'
-                       stop
-               endif
-            enddo
-            enddo
-            if (l_stop) then
-                write (nu_diag,*) ' my_task, iblk =', &
-                                   my_task, iblk
-                write (nu_diag,*) 'Global block:', this_block%block_id
-                if (istop > 0 .and. jstop > 0) &
-                     write(nu_diag,*) 'Global i and j:', &
-                                      this_block%i_glob(istop), &
-                                      this_block%j_glob(jstop)
-                call abort_ice ('ice: ITD cleanup error in ice_HaloRestore')
-            endif
-         endif
-      endif
-
-      if (this_block%iblock == nblocks_x) then  ! east edge
-         if (trim(ew_boundary_type) /= 'cyclic') then
-            ! locate ghost cell column (avoid padding)
-            ibc = nx_block
-            do i = nx_block, 1, -1
-               npad = 0
-               if (this_block%i_glob(i) == 0) then
-                  do j = 1, ny_block
-                     npad = npad + this_block%j_glob(j)
-                  enddo
-               endif
-               if (npad /= 0) ibc = ibc - 1
-            enddo
-
-            do n = 1, ncat
-            do j = 1, ny_block
-            do i = ihi, ibc
-               aicen(i,j,n,iblk) = aicen_rest(i,j,n,iblk)!aicen(i,j,n,iblk) &
-                  !+ (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
-               vicen(i,j,n,iblk) =vicen_rest(i,j,n,iblk) !vicen(i,j,n,iblk) &
-                  !+ (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
-               vsnon(i,j,n,iblk) = vsnon_rest(i,j,n,iblk)!vsnon(i,j,n,iblk) &
-                  !+ (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
-               do nt = 1, ntrcr
-               if  ((nt == nt_qice).or.(nt == nt_sice)) then ! not sure this is needed
-                     do k = 1,nilyr
-                           trcrn(i,j,nt+k-1,n,iblk) = &
-                                   trcrn_rest(i,j,nt+k-1,n,iblk)
-                              !trcrn(i,j,nt+k-1,n,iblk) &
-                              !+ (trcrn_rest(i,j,nt+k-1,n,iblk)- &
-                              !   trcrn(i,j,nt+k-1,n,iblk)) &
-                              !*ctime
-                     enddo
-               else if  ((nt == nt_qsno)) then
-                     do k = 1,nslyr
-                           trcrn(i,j,nt+k-1,n,iblk) = &
-                                   trcrn_rest(i,j,nt+k-1,n,iblk)
-                              !trcrn(i,j,nt+k-1,n,iblk) &
-                              !+ (trcrn_rest(i,j,nt+k-1,n,iblk)- &
-                              !   trcrn(i,j,nt+k-1,n,iblk)) &
-                              !*ctime
-                     enddo
-               else
-                    trcrn(i,j,nt,n,iblk) = trcrn_rest(i,j,nt,n,iblk)!trcrn(i,j,nt,n,iblk) &
-                       !+ (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
-               endif
-               enddo
-            enddo
-            enddo
-            enddo
-
-            do j = 1, ny_block
-            do i = ihi, ibc
-              if (aice(ihi-1,j,iblk)>0. .and. aice(i,j,iblk)>0.) then !add veloceties
-                       uvel(i,j,iblk)=uvel(ihi-1,j,iblk)
-                       vvel(i,j,iblk)=vvel(ihi-1,j,iblk)
-              endif
-              if (sum(aicen(i,j,:,iblk))>1.) then !warning
-                       write (nu_diag,*) 'aice>1 at i,j East: ',i,j
-                       write (nu_diag,*) 'sum(aicen_rest(i,j,:,iblk)):',sum(aicen_rest(i,j,:,iblk))
-                       write (nu_diag,*) 'error stopping model'
-                       stop
-              endif
-            enddo
-            enddo
-
-            if (l_stop) then
-                write (nu_diag,*) ' my_task, iblk =', &
-                                   my_task, iblk
-                write (nu_diag,*) 'Global block:', this_block%block_id
-                if (istop > 0 .and. jstop > 0) &
-                     write(nu_diag,*) 'Global i and j:', &
-                                      this_block%i_glob(istop), &
-                                      this_block%j_glob(jstop)
-                call abort_ice ('ice: ITD cleanup error in ice_HaloRestore')
-            endif
-         endif
-      endif
-
-      if (this_block%jblock == 1) then              ! south edge
-         if (trim(ns_boundary_type) /= 'cyclic') then
-            do n = 1, ncat
-            do j = 1, jlo
-            do i = 1, nx_block
-               aicen(i,j,n,iblk) = aicen_rest(i,j,n,iblk)!aicen(i,j,n,iblk) &
-                  !+ (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
-               vicen(i,j,n,iblk) = vicen_rest(i,j,n,iblk) !vicen(i,j,n,iblk) &
-                  !+ (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
-               vsnon(i,j,n,iblk) = vsnon_rest(i,j,n,iblk)!vsnon(i,j,n,iblk) &
-                  !+ (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
-               do nt = 1, ntrcr
-                  if  ((nt == nt_qice).or. (nt == nt_sice)) then! not sure this is needed
-                     do k = 1,nilyr
-                           trcrn(i,j,nt+k-1,n,iblk) = &
-                                   trcrn_rest(i,j,nt+k-1,n,iblk)
-                              !trcrn(i,j,nt+k-1,n,iblk) &
-                              !+ (trcrn_rest(i,j,nt+k-1,n,iblk)- &
-                              !   trcrn(i,j,nt+k-1,n,iblk)) &
-                              !*ctime
-                     enddo
-                  else if (nt == nt_qsno) then
-                     do k = 1,nslyr
-                           trcrn(i,j,nt+k-1,n,iblk) = &
-                                   trcrn_rest(i,j,nt+k-1,n,iblk)
-                              !trcrn(i,j,nt+k-1,n,iblk) &
-                              !+ (trcrn_rest(i,j,nt+k-1,n,iblk)- &
-                              !   trcrn(i,j,nt+k-1,n,iblk)) &
-                              !*ctime
-                     enddo
-                  else
-                   trcrn(i,j,nt,n,iblk) = trcrn_rest(i,j,nt,n,iblk)!trcrn(i,j,nt,n,iblk) &
-                      !+ (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
-                  endif
-               enddo
-            enddo
-            enddo
-            enddo
-            do j = 1, jlo
-            do i = 1, nx_block
-              if (aice(i,jlo+1,iblk)>0. .and. aice(i,j,iblk)>0.) then !add veloceties
-                      vvel(i,j,iblk)=vvel(i,jlo+1,iblk)
-                      uvel(i,j,iblk)=uvel(i,jlo+1,iblk)
-              endif
-              if (sum(aicen(i,j,:,iblk))>1.) then !warning
-                       write (nu_diag,*) 'aice>1 at i,j South: ',i,j
-                       write (nu_diag,*) 'sum(aicen_rest(i,j,:,iblk)):',sum(aicen_rest(i,j,:,iblk))
-                       write (nu_diag,*) 'error stopping model'
-                       stop
-              endif
-            enddo
-            enddo
-
-            if (l_stop) then
-                write (nu_diag,*) ' my_task, iblk =', &
-                                   my_task, iblk
-                write (nu_diag,*) 'Global block:', this_block%block_id
-                if (istop > 0 .and. jstop > 0) &
-                     write(nu_diag,*) 'Global i and j:', &
-                                      this_block%i_glob(istop), &
-                                      this_block%j_glob(jstop)
-                call abort_ice ('ice: ITD cleanup error in ice_HaloRestore')
-            endif
-         endif
-      endif
-
-      if (this_block%jblock == nblocks_y) then  ! north edge
-         if (trim(ns_boundary_type) /= 'cyclic' .and. &
-             trim(ns_boundary_type) /= 'tripole' .and. &
-             trim(ns_boundary_type) /= 'tripoleT') then
-            ! locate ghost cell row (avoid padding)
-            ibc = ny_block
-            do j = ny_block, 1, -1
-               npad = 0
-               if (this_block%j_glob(j) == 0) then
-                  do i = 1, nx_block
-                     npad = npad + this_block%i_glob(i)
-                  enddo
-               endif
-               if (npad /= 0) ibc = ibc - 1
-            enddo
-
-            do n = 1, ncat
-            do j = jhi-1, ibc
-            do i = 1, nx_block
-               aicen(i,j,n,iblk) = aicen_rest(i,jhi,n,iblk)!aicen(i,j,n,iblk) &
-                  !+ (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
-               vicen(i,j,n,iblk) = vicen_rest(i,jhi,n,iblk)!vicen(i,j,n,iblk) &
-                  !+ (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
-               vsnon(i,j,n,iblk) = vsnon_rest(i,jhi,n,iblk)!vsnon(i,j,n,iblk) &
-                  !+ (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
-               do nt = 1, ntrcr
-                  if  ((nt == nt_qice).or. (nt == nt_sice)) then ! not sure this is needed
-                     do k = 1,nilyr
-                           trcrn(i,j,nt+k-1,n,iblk) = &
-                                   trcrn_rest(i,jhi,nt+k-1,n,iblk)
-                              !trcrn(i,j,nt+k-1,n,iblk) &
-                              !+ (trcrn_rest(i,j,nt+k-1,n,iblk)- &
-                              !   trcrn(i,j,nt+k-1,n,iblk)) &
-                              !*ctime
-                     enddo
-                  else if (nt == nt_qsno) then
-                     do k = 1,nslyr
-                           trcrn(i,j,nt+k-1,n,iblk) = &
-                                   trcrn_rest(i,jhi,nt+k-1,n,iblk)
-                              !trcrn(i,j,nt+k-1,n,iblk) &
-                              !+ (trcrn_rest(i,j,nt+k-1,n,iblk)- &
-                              !   trcrn(i,j,nt+k-1,n,iblk)) &
-                              !*ctime
-                     enddo
-                  else
-                    trcrn(i,j,nt,n,iblk) =trcrn_rest(i,j,nt,n,iblk) !trcrn(i,j,nt,n,iblk) &
-                       !+ (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
-                  endif
-               enddo
-            enddo
-            enddo
-            enddo
-                 !write (nu_diag,*) 'ctime: ',ctime
-                 do j = jhi-2, ibc
-                 do i = 1, nx_block
-                   if ((aice(i,j,iblk)>0.) .and. (aice(i,jhi-2,iblk)>0.)) then !add veloceties
-                       vvel(i,j,iblk)=vvel(i,jhi-2,iblk)
-                       uvel(i,j,iblk)=uvel(i,jhi-2,iblk)
-                   endif
-                 enddo
-                 enddo
-                 do j = jhi-1, ibc
-                 do i = 1, nx_block
-                   if (sum(aicen(i,j,:,iblk))>1.) then !warning
-                       write (nu_diag,*) 'aice>1 at i,j North: ',i,j
-                       write (nu_diag,*) 'sum(aicen_rest(i,j,:,iblk)):',sum(aicen_rest(i,j,:,iblk))
-                       write (nu_diag,*) 'error stopping model'
-                       stop
-                   endif
-                 enddo
-                 enddo
-                 do j = jhi-1, ibc
-                 do i = 1, nx_block
-                 enddo
-                 enddo
-
-                 if (l_stop) then
-                    write (nu_diag,*) ' my_task, iblk =', &
-                                   my_task, iblk
-                    write (nu_diag,*) 'Global block:', this_block%block_id
-                    if (istop > 0 .and. jstop > 0) &
-                        write(nu_diag,*) 'Global i and j:', &
-                                      this_block%i_glob(istop), &
-                                      this_block%j_glob(jstop)
-                    call abort_ice ('ice: ITD cleanup error in ice_HaloRestore')
-            endif
-         endif
-      endif
-
-   enddo ! iblk
-   call bound_state (aicen,vicen, vsnon, ntrcr, trcrn)
-      ! from https://doi.org/10.5194/gmd-15-4373-2022 bdy implemnetation
-      ! maybe not neccessary
-   elseif ((sea_ice_time_bry) .and. (bdy_origin=='intern' .or. bdy_origin=='restart_f')) then
+   if ((sea_ice_time_bry) .and. (bdy_origin=='intern' .or. bdy_origin=='restart_f')) then
    write(nu_diag,*) 'stressm_3 before : ',sum(stressm_3(:,:,:))
    call ice_HaloRestore_getbdy
    !$OMP PARALLEL DO PRIVATE(iblk,ilo,ihi,jlo,jhi,this_block, &
@@ -1819,7 +1388,7 @@ end subroutine ice_HaloRestore_getbdy
                if (npad /= 0) ibc = ibc - 1
             enddo
 
-            do i = ihi-nfact, ihi!test ims: ibc
+            do i = ihi-nfact, ibc!test ims: ibc
             do j = 1, ny_block
             do n = 1, ncat
                aicen(i,j,n,iblk) = aicen(i,j,n,iblk) &
@@ -2182,7 +1751,6 @@ end subroutine ice_HaloRestore_getbdy
 
    enddo ! iblk
    endif
-   !$OMP END PARALLEL DO
 
    call ice_timer_stop(timer_bound)
 

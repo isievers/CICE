@@ -57,12 +57,14 @@
 
    character (char_len), public :: &
       ew_boundary_type, &! type of domain bndy in each logical
-      ns_boundary_type   !    direction (ew is i, ns is j)
+      ns_boundary_type,&  !    direction (ew is i, ns is j)
+      bdy_origin       ! type of bdy files ('intern' 'non')
 
    logical (kind=log_kind), public :: &
       maskhalo_dyn   , & ! if true, use masked halo updates for dynamics
       maskhalo_remap , & ! if true, use masked halo updates for transport
       maskhalo_bound , & ! if true, use masked halo updates for bound_state
+      sea_ice_time_bry, &  ! if true, use time-varying sea-ice boundary files
       halo_dynbundle , & ! if true, bundle halo update in dynamics
       landblockelim      ! if true, land block elimination is on
 
@@ -142,6 +144,8 @@
                          maskhalo_dyn,      &
                          maskhalo_remap,    &
                          maskhalo_bound,    &
+                         sea_ice_time_bry,  &
+                         bdy_origin,        &
                          add_mpi_barriers,  &
                          debug_blocks
 
@@ -161,6 +165,8 @@
    maskhalo_dyn      = .false.     ! if true, use masked halos for dynamics
    maskhalo_remap    = .false.     ! if true, use masked halos for transport
    maskhalo_bound    = .false.     ! if true, use masked halos for bound_state
+   sea_ice_time_bry  = .true.     ! if true, use time-varying sea-ice boundary files
+   bdy_origin        = 'restart_f' ! 'non', or 'restart_f': resart_f reads from restart file
    halo_dynbundle    = .true.      ! if true, bundle halo updates in dynamics
    add_mpi_barriers  = .false.     ! if true, throttle communication
    debug_blocks      = .false.     ! if true, print verbose block information
@@ -216,6 +222,8 @@
    call broadcast_scalar(maskhalo_dyn,      master_task)
    call broadcast_scalar(maskhalo_remap,    master_task)
    call broadcast_scalar(maskhalo_bound,    master_task)
+   call broadcast_scalar(sea_ice_time_bry,  master_task)
+   call broadcast_scalar(bdy_origin,  master_task)
    call broadcast_scalar(add_mpi_barriers,  master_task)
    call broadcast_scalar(debug_blocks,      master_task)
    call broadcast_scalar(max_blocks,        master_task)
@@ -297,6 +305,9 @@
      write(nu_diag,'(a,2i6)') '  block_size_x,_y       = ', block_size_x, block_size_y
      write(nu_diag,'(a,i6)')  '  max_blocks            = ', max_blocks
      write(nu_diag,'(a,i6,/)')'  Number of ghost cells = ', nghost
+     write(nu_diag,'(a26,l6)') '  sea_ice_time_bry      = ', &
+                                  sea_ice_time_bry
+     write(nu_diag,'(a,a)')   '  bdy_origin      = ', trim(bdy_origin)
    endif
 
 !----------------------------------------------------------------------
