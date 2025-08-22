@@ -8,6 +8,7 @@ doc/build
 # Ignore macOS cache files
 .DS_Store
 
+#ignore linked icepack directory
 
 # Ignore testsuite file/directories
 testsuite*
