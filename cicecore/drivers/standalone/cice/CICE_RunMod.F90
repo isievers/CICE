@@ -263,7 +263,6 @@
             enddo
             !$OMP END PARALLEL DO
          endif ! ktherm > 0
-
          ! clean up, update tendency diagnostics
          offset = dt
          call update_state (dt=dt, daidt=daidtt, dvidt=dvidtt, dvsdt=dvsdtt, &
@@ -319,7 +318,7 @@
                call debug_ice (iblk, plabeld)
             enddo
          endif
-
+        ! if (restore_ice) call ice_HaloRestore
          call ice_timer_start(timer_column)  ! column physics
          call ice_timer_start(timer_thermo)  ! thermodynamics
 

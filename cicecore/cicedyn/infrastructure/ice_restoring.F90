@@ -473,7 +473,7 @@
    vicen_rest(:,:,:,:) = c0
    vsnon_rest(:,:,:,:) = c0
    trcrn_rest(:,:,:,:,:) = c0
-   nfact=1
+   nfact=0.
 
    if (sea_ice_time_bry) then
    call get_forcing_bry
@@ -1281,15 +1281,17 @@ end subroutine ice_HaloRestore_getbdy
          trest = real(trestore,kind=dbl_kind) * secday ! seconds
       endif
       ctime = dt/trest
-      nfact=1
+      nfact=0.
 !-----------------------------------------------------------------------
 !
 !  Restore values in cells surrounding the grid
 !
 !-----------------------------------------------------------------------
    if ((sea_ice_time_bry) .and. (bdy_origin=='intern' .or. bdy_origin=='restart_f')) then
-   write(nu_diag,*) 'stressm_3 before : ',sum(stressm_3(:,:,:))
+   write(nu_diag,*) 'stressm_3 before : ',sum(uvel(2,7,:))
+   write(nu_diag,*) 'ctime : ',ctime
    call ice_HaloRestore_getbdy
+   write(nu_diag,*) 'stressm_3_bdy before : ',sum(uvel_rest(2,7,:))
    !$OMP PARALLEL DO PRIVATE(iblk,ilo,ihi,jlo,jhi,this_block, &
    !$OMP                     i,j,n,nt,ibc,npad)
    do iblk = 1, nblocks
@@ -1300,76 +1302,76 @@ end subroutine ice_HaloRestore_getbdy
       jhi = this_block%jhi
       if (this_block%iblock == 1) then              ! west edge
          if (trim(ew_boundary_type) /= 'cyclic') then
-            do i = ilo, ilo+nfact !test ims
+            do i = 1, ilo+nfact !test ims
             do j = 1, ny_block
             do n = 1, ncat
-               aicen(i,j,n,iblk) = aicen(i,j,n,iblk) &
-                  + (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
-               vicen(i,j,n,iblk) = vicen(i,j,n,iblk) &
-                  + (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
-               vsnon(i,j,n,iblk) = vsnon(i,j,n,iblk) &
-                  + (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
-               dhsn(i,j,n,iblk) = dhsn(i,j,n,iblk) &
-                      + (dhs_bry(i,j,n,iblk)-dhsn(i,j,n,iblk))*ctime
-               ffracn(i,j,n,iblk) = ffracn(i,j,n,iblk) &
-                       + (ffrac_bry(i,j,n,iblk)-ffracn(i,j,n,iblk))*ctime
+               aicen(i,j,n,iblk) = aicen_rest(i,j,n,iblk) !&
+                  !+ (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
+               vicen(i,j,n,iblk) = vicen_rest(i,j,n,iblk) !&
+                  !+ (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
+               vsnon(i,j,n,iblk) = vsnon_rest(i,j,n,iblk) !&
+                  !+ (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
+               dhsn(i,j,n,iblk) = dhs_rest(i,j,n,iblk) !&
+                      !+ (dhs_rest(i,j,n,iblk)-dhsn(i,j,n,iblk))*ctime
+               ffracn(i,j,n,iblk) = ffrac_rest(i,j,n,iblk) !&
+                       !+ (ffrac_rest(i,j,n,iblk)-ffracn(i,j,n,iblk))*ctime
                do nt = 1, ntrcr
-                  trcrn(i,j,nt,n,iblk) = trcrn(i,j,nt,n,iblk) &
-                     + (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
+                  trcrn(i,j,nt,n,iblk) = trcrn_rest(i,j,nt,n,iblk) !&
+                     !+ (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
                enddo
             enddo
-               uvel(i,j,iblk) = uvel(i,j,iblk) &
-                       + (uvel_bry(i,j,iblk)-uvel(i,j,iblk))*ctime
-               vvel(i,j,iblk) = vvel(i,j,iblk) &
-                       + (vvel_bry(i,j,iblk)-vvel(i,j,iblk))*ctime
-               scale_factor(i,j,iblk) = scale_factor(i,j,iblk) &
-                       + (scale_factor_bry(i,j,iblk)-scale_factor(i,j,iblk))*ctime
-               swvdr(i,j,iblk) = swvdr(i,j,iblk) &
-                       + (swvdr_bry(i,j,iblk)-swvdr(i,j,iblk))*ctime
-               swvdf(i,j,iblk) = swvdf(i,j,iblk) &
-                       + (swvdf_bry(i,j,iblk)-swvdf(i,j,iblk))*ctime
-               swidr(i,j,iblk) = swidr(i,j,iblk) &
-                       + (swidr_bry(i,j,iblk)-swidr(i,j,iblk))*ctime
-               swidf(i,j,iblk) = swidf(i,j,iblk) &
-                       + (swidf_bry(i,j,iblk)-swidf(i,j,iblk))*ctime
-               strocnxT_iavg(i,j,iblk) = strocnxT_iavg(i,j,iblk) &
-                       + (strocnxT_bry(i,j,iblk)-strocnxT_iavg(i,j,iblk))*ctime
-               strocnyT_iavg(i,j,iblk) = strocnyT_iavg(i,j,iblk) &
-                       + (strocnyT_bry(i,j,iblk)-strocnyT_iavg(i,j,iblk))*ctime
-               stressp_1(i,j,iblk) = stressp_1(i,j,iblk) &
-                       + (stressp_1_bry(i,j,iblk)-stressp_1(i,j,iblk))*ctime
-               stressp_2(i,j,iblk) = stressp_2(i,j,iblk) &
-                       + (stressp_2_bry(i,j,iblk)-stressp_2(i,j,iblk))*ctime
-               stressp_3(i,j,iblk) = stressp_3(i,j,iblk) &
-                       + (stressp_3_bry(i,j,iblk)-stressp_3(i,j,iblk))*ctime
-               stressp_4(i,j,iblk) = stressp_4(i,j,iblk) &
-                       + (stressp_4_bry(i,j,iblk)-stressp_4(i,j,iblk))*ctime
-               stressm_1(i,j,iblk) = stressm_1(i,j,iblk) &
-                       + (stressm_1_bry(i,j,iblk)-stressm_1(i,j,iblk))*ctime
-               stressm_2(i,j,iblk) = stressm_2(i,j,iblk) &
-                       + (stressm_2_bry(i,j,iblk)-stressm_2(i,j,iblk))*ctime
-               stressm_3(i,j,iblk) = stressm_3(i,j,iblk) &
-                       + (stressm_3_bry(i,j,iblk)-stressm_3(i,j,iblk))*ctime
-               stressm_4(i,j,iblk) = stressm_4(i,j,iblk) &
-                       + (stressm_4_bry(i,j,iblk)-stressm_4(i,j,iblk))*ctime
-               stress12_1(i,j,iblk) = stress12_1(i,j,iblk) &
-                       + (stress12_1_bry(i,j,iblk)-stress12_1(i,j,iblk))*ctime
-               stress12_2(i,j,iblk) = stress12_2(i,j,iblk) &
-                       + (stress12_2_bry(i,j,iblk)-stress12_2(i,j,iblk))*ctime
-               stress12_3(i,j,iblk) = stress12_3(i,j,iblk) &
-                       + (stress12_3_bry(i,j,iblk)-stress12_3(i,j,iblk))*ctime
-               stress12_4(i,j,iblk) = stress12_4(i,j,iblk) &
-                       + (stress12_4_bry(i,j,iblk)-stress12_4(i,j,iblk))*ctime
-               iceUmask(i,j,iblk) = iceUmask(i,j,iblk) &
-                       + (iceumask_bry(i,j,iblk)-iceUmask(i,j,iblk))*ctime
-               frz_onset(i,j,iblk) = frz_onset(i,j,iblk) &
-                       + (frz_onset_bry(i,j,iblk)-frz_onset(i,j,iblk))*ctime
-               fsnow(i,j,iblk) = fsnow(i,j,iblk) &
-                       + (fsnow_bry(i,j,iblk)-fsnow(i,j,iblk))*ctime
-               sst(i,j,iblk) = sst(i,j,iblk) &
-                       + (sst_bry(i,j,iblk)-sst(i,j,iblk))*ctime
-               frzmlt(i,j,iblk) = frzmlt(i,j,iblk) &
-                       + (frzmelt_bry(i,j,iblk)-frzmlt(i,j,iblk))*ctime
+               uvel(i,j,iblk) = uvel_rest(i,j,iblk)! &
+                       !+ (uvel_rest(i,j,iblk)-uvel(i,j,iblk))*ctime
+               vvel(i,j,iblk) = vvel_rest(i,j,iblk) !&
+                       !+ (vvel_rest(i,j,iblk)-vvel(i,j,iblk))*ctime
+               scale_factor(i,j,iblk) = scale_factor_rest(i,j,iblk) !&
+                       !+ (scale_factor_rest(i,j,iblk)-scale_factor(i,j,iblk))*ctime
+               swvdr(i,j,iblk) = swvdr_rest(i,j,iblk) !&
+                       !+ (swvdr_rest(i,j,iblk)-swvdr(i,j,iblk))*ctime
+               swvdf(i,j,iblk) = swvdf_rest(i,j,iblk) !&
+                       !+ (swvdf_rest(i,j,iblk)-swvdf(i,j,iblk))*ctime
+               swidr(i,j,iblk) = swidr_rest(i,j,iblk) !&
+                       !+ (swidr_rest(i,j,iblk)-swidr(i,j,iblk))*ctime
+               swidf(i,j,iblk) = swidf_rest(i,j,iblk) !&
+                       !+ (swidf_rest(i,j,iblk)-swidf(i,j,iblk))*ctime
+               strocnxT_iavg(i,j,iblk) = strocnxT_rest(i,j,iblk) !&
+                       !+ (strocnxT_rest(i,j,iblk)-strocnxT_iavg(i,j,iblk))*ctime
+               strocnyT_iavg(i,j,iblk) = strocnyT_rest(i,j,iblk) !&
+                       !+ (strocnyT_rest(i,j,iblk)-strocnyT_iavg(i,j,iblk))*ctime
+               stressp_1(i,j,iblk) = stressp_1_rest(i,j,iblk) !&
+                       !+ (stressp_1_rest(i,j,iblk)-stressp_1(i,j,iblk))*ctime
+               stressp_2(i,j,iblk) = stressp_2_rest(i,j,iblk) !&
+                       !+ (stressp_2_rest(i,j,iblk)-stressp_2(i,j,iblk))*ctime
+               stressp_3(i,j,iblk) = stressp_3_rest(i,j,iblk) !&
+                       !+ (stressp_3_rest(i,j,iblk)-stressp_3(i,j,iblk))*ctime
+               stressp_4(i,j,iblk) = stressp_4_rest(i,j,iblk) !&
+                       !+ (stressp_4_rest(i,j,iblk)-stressp_4(i,j,iblk))*ctime
+               stressm_1(i,j,iblk) = stressm_1_rest(i,j,iblk) !&
+                       !+ (stressm_1_rest(i,j,iblk)-stressm_1(i,j,iblk))*ctime
+               stressm_2(i,j,iblk) = stressm_2_rest(i,j,iblk) !&
+                       !+ (stressm_2_rest(i,j,iblk)-stressm_2(i,j,iblk))*ctime
+               stressm_3(i,j,iblk) = stressm_3_rest(i,j,iblk) !&
+                       !+ (stressm_3_rest(i,j,iblk)-stressm_3(i,j,iblk))*ctime
+               stressm_4(i,j,iblk) = stressm_4_rest(i,j,iblk) !&
+                       !+ (stressm_4_rest(i,j,iblk)-stressm_4(i,j,iblk))*ctime
+               stress12_1(i,j,iblk) = stress12_1_rest(i,j,iblk) !&
+                       !+ (stress12_1_rest(i,j,iblk)-stress12_1(i,j,iblk))*ctime
+               stress12_2(i,j,iblk) = stress12_2_rest(i,j,iblk) !&
+                       !+ (stress12_2_rest(i,j,iblk)-stress12_2(i,j,iblk))*ctime
+               stress12_3(i,j,iblk) = stress12_3_rest(i,j,iblk) !&
+                       !+ (stress12_3_rest(i,j,iblk)-stress12_3(i,j,iblk))*ctime
+               stress12_4(i,j,iblk) = stress12_4_rest(i,j,iblk) !&
+                       !+ (stress12_4_rest(i,j,iblk)-stress12_4(i,j,iblk))*ctime
+               iceUmask(i,j,iblk) = iceumask_rest(i,j,iblk)!&
+                       !+ (iceumask_rest(i,j,iblk)-iceUmask(i,j,iblk))*ctime
+               frz_onset(i,j,iblk) = frz_onset_rest(i,j,iblk) !&
+                       !+ (frz_onset_rest(i,j,iblk)-frz_onset(i,j,iblk))*ctime
+               fsnow(i,j,iblk) = fsnow_rest(i,j,iblk) !&
+                       !+ (fsnow_rest(i,j,iblk)-fsnow(i,j,iblk))*ctime
+               sst(i,j,iblk) = sst_rest(i,j,iblk) !&
+                       !+ (sst_rest(i,j,iblk)-sst(i,j,iblk))*ctime
+               frzmlt(i,j,iblk) = frzmelt_rest(i,j,iblk) !&
+                       !+ (frzmelt_rest(i,j,iblk)-frzmlt(i,j,iblk))*ctime
             enddo
             enddo
          endif ! this_block%iblock == 1
@@ -1391,149 +1393,147 @@ end subroutine ice_HaloRestore_getbdy
             do i = ihi-nfact, ibc!test ims: ibc
             do j = 1, ny_block
             do n = 1, ncat
-               aicen(i,j,n,iblk) = aicen(i,j,n,iblk) &
-                  + (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
-               vicen(i,j,n,iblk) = vicen(i,j,n,iblk) &
-                  + (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
-               vsnon(i,j,n,iblk) = vsnon(i,j,n,iblk) &
-                  + (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
-               dhsn(i,j,n,iblk) = dhsn(i,j,n,iblk) &
-                      + (dhs_bry(i,j,n,iblk)-dhsn(i,j,n,iblk))*ctime
-               ffracn(i,j,n,iblk) = ffracn(i,j,n,iblk) &
-                       + (ffrac_bry(i,j,n,iblk)-ffracn(i,j,n,iblk))*ctime
+               aicen(i,j,n,iblk) = aicen_rest(i,j,n,iblk) !&
+                  !+ (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
+               vicen(i,j,n,iblk) = vicen_rest(i,j,n,iblk) !&
+                  !+ (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
+               vsnon(i,j,n,iblk) = vsnon_rest(i,j,n,iblk) !&
+                  !+ (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
+               dhsn(i,j,n,iblk) = dhs_rest(i,j,n,iblk) !&
+                      !+ (dhs_rest(i,j,n,iblk)-dhsn(i,j,n,iblk))*ctime
+               ffracn(i,j,n,iblk) = ffrac_rest(i,j,n,iblk) !&
+                       !+ (ffrac_rest(i,j,n,iblk)-ffracn(i,j,n,iblk))*ctime
                do nt = 1, ntrcr
-                  trcrn(i,j,nt,n,iblk) = trcrn(i,j,nt,n,iblk) &
-                     + (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
+                  trcrn(i,j,nt,n,iblk) = trcrn_rest(i,j,nt,n,iblk) !&
+                     !+ (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
                enddo
             enddo
-               uvel(i,j,iblk) = uvel(i,j,iblk) &
-                       + (uvel_bry(i,j,iblk)-uvel(i,j,iblk))*ctime
-               vvel(i,j,iblk) = vvel(i,j,iblk) &
-                       + (vvel_bry(i,j,iblk)-vvel(i,j,iblk))*ctime
-               scale_factor(i,j,iblk) = scale_factor(i,j,iblk) &
-                       + (scale_factor_bry(i,j,iblk)-scale_factor(i,j,iblk))*ctime
-               swvdr(i,j,iblk) = swvdr(i,j,iblk) &
-                       + (swvdr_bry(i,j,iblk)-swvdr(i,j,iblk))*ctime
-               swvdf(i,j,iblk) = swvdf(i,j,iblk) &
-                       + (swvdf_bry(i,j,iblk)-swvdf(i,j,iblk))*ctime
-               swidr(i,j,iblk) = swidr(i,j,iblk) &
-                       + (swidr_bry(i,j,iblk)-swidr(i,j,iblk))*ctime
-               swidf(i,j,iblk) = swidf(i,j,iblk) &
-                       + (swidf_bry(i,j,iblk)-swidf(i,j,iblk))*ctime
-               strocnxT_iavg(i,j,iblk) = strocnxT_iavg(i,j,iblk) &
-                       + (strocnxT_bry(i,j,iblk)-strocnxT_iavg(i,j,iblk))*ctime
-               strocnyT_iavg(i,j,iblk) = strocnyT_iavg(i,j,iblk) &
-                       + (strocnyT_bry(i,j,iblk)-strocnyT_iavg(i,j,iblk))*ctime
-               stressp_1(i,j,iblk) = stressp_1(i,j,iblk) &
-                       + (stressp_1_bry(i,j,iblk)-stressp_1(i,j,iblk))*ctime
-               stressp_2(i,j,iblk) = stressp_2(i,j,iblk) &
-                       + (stressp_2_bry(i,j,iblk)-stressp_2(i,j,iblk))*ctime
-               stressp_3(i,j,iblk) = stressp_3(i,j,iblk) &
-                       + (stressp_3_bry(i,j,iblk)-stressp_3(i,j,iblk))*ctime
-               stressp_4(i,j,iblk) = stressp_4(i,j,iblk) &
-                       + (stressp_4_bry(i,j,iblk)-stressp_4(i,j,iblk))*ctime
-               stressm_1(i,j,iblk) = stressm_1(i,j,iblk) &
-                       + (stressm_1_bry(i,j,iblk)-stressm_1(i,j,iblk))*ctime
-               stressm_2(i,j,iblk) = stressm_2(i,j,iblk) &
-                       + (stressm_2_bry(i,j,iblk)-stressm_2(i,j,iblk))*ctime
-               stressm_3(i,j,iblk) = stressm_3(i,j,iblk) &
-                       + (stressm_3_bry(i,j,iblk)-stressm_3(i,j,iblk))*ctime
-               stressm_4(i,j,iblk) = stressm_4(i,j,iblk) &
-                       + (stressm_4_bry(i,j,iblk)-stressm_4(i,j,iblk))*ctime
-               stress12_1(i,j,iblk) = stress12_1(i,j,iblk) &
-                       + (stress12_1_bry(i,j,iblk)-stress12_1(i,j,iblk))*ctime
-               stress12_2(i,j,iblk) = stress12_2(i,j,iblk) &
-                       + (stress12_2_bry(i,j,iblk)-stress12_2(i,j,iblk))*ctime
-               stress12_3(i,j,iblk) = stress12_3(i,j,iblk) &
-                       + (stress12_3_bry(i,j,iblk)-stress12_3(i,j,iblk))*ctime
-               stress12_4(i,j,iblk) = stress12_4(i,j,iblk) &
-                       + (stress12_4_bry(i,j,iblk)-stress12_4(i,j,iblk))*ctime
-               iceUmask(i,j,iblk) = iceUmask(i,j,iblk) &
-                       + (iceumask_bry(i,j,iblk)-iceUmask(i,j,iblk))*ctime
-               frz_onset(i,j,iblk) = frz_onset(i,j,iblk) &
-                       + (frz_onset_bry(i,j,iblk)-frz_onset(i,j,iblk))*ctime
-               fsnow(i,j,iblk) = fsnow(i,j,iblk) &
-                       + (fsnow_bry(i,j,iblk)-fsnow(i,j,iblk))*ctime
-               sst(i,j,iblk) = sst(i,j,iblk) &
-                       + (sst_bry(i,j,iblk)-sst(i,j,iblk))*ctime
-               frzmlt(i,j,iblk) = frzmlt(i,j,iblk) &
-                       + (frzmelt_bry(i,j,iblk)-frzmlt(i,j,iblk))*ctime
+               uvel(i,j,iblk) = uvel_rest(i,j,iblk)! &
+                       !+ (uvel_rest(i,j,iblk)-uvel(i,j,iblk))*ctime
+               vvel(i,j,iblk) = vvel_rest(i,j,iblk) !&
+                       !+ (vvel_rest(i,j,iblk)-vvel(i,j,iblk))*ctime
+               scale_factor(i,j,iblk) = scale_factor_rest(i,j,iblk) !&
+                       !+ (scale_factor_rest(i,j,iblk)-scale_factor(i,j,iblk))*ctime
+               swvdr(i,j,iblk) = swvdr_rest(i,j,iblk) !&
+                       !+ (swvdr_rest(i,j,iblk)-swvdr(i,j,iblk))*ctime
+               swvdf(i,j,iblk) = swvdf_rest(i,j,iblk) !&
+                       !+ (swvdf_rest(i,j,iblk)-swvdf(i,j,iblk))*ctime
+               swidr(i,j,iblk) = swidr_rest(i,j,iblk) !&
+                       !+ (swidr_rest(i,j,iblk)-swidr(i,j,iblk))*ctime
+               swidf(i,j,iblk) = swidf_rest(i,j,iblk) !&
+                       !+ (swidf_rest(i,j,iblk)-swidf(i,j,iblk))*ctime
+               strocnxT_iavg(i,j,iblk) = strocnxT_rest(i,j,iblk) !&
+                       !+ (strocnxT_rest(i,j,iblk)-strocnxT_iavg(i,j,iblk))*ctime
+               strocnyT_iavg(i,j,iblk) = strocnyT_rest(i,j,iblk) !&
+                       !+ (strocnyT_rest(i,j,iblk)-strocnyT_iavg(i,j,iblk))*ctime
+               stressp_1(i,j,iblk) = stressp_1_rest(i,j,iblk) !&
+                       !+ (stressp_1_rest(i,j,iblk)-stressp_1(i,j,iblk))*ctime
+               stressp_2(i,j,iblk) = stressp_2_rest(i,j,iblk) !&
+                       !+ (stressp_2_rest(i,j,iblk)-stressp_2(i,j,iblk))*ctime
+               stressp_3(i,j,iblk) = stressp_3_rest(i,j,iblk) !&
+                       !+ (stressp_3_rest(i,j,iblk)-stressp_3(i,j,iblk))*ctime
+               stressp_4(i,j,iblk) = stressp_4_rest(i,j,iblk) !&
+                       !+ (stressp_4_rest(i,j,iblk)-stressp_4(i,j,iblk))*ctime
+               stressm_1(i,j,iblk) = stressm_1_rest(i,j,iblk) !&
+                       !+ (stressm_1_rest(i,j,iblk)-stressm_1(i,j,iblk))*ctime
+               stressm_2(i,j,iblk) = stressm_2_rest(i,j,iblk) !&
+                       !+ (stressm_2_rest(i,j,iblk)-stressm_2(i,j,iblk))*ctime
+               stressm_3(i,j,iblk) = stressm_3_rest(i,j,iblk) !&
+               stressm_4(i,j,iblk) = stressm_4_rest(i,j,iblk) !&
+                       !+ (stressm_4_rest(i,j,iblk)-stressm_4(i,j,iblk))*ctime
+               stress12_1(i,j,iblk) = stress12_1_rest(i,j,iblk) !&
+                       !+ (stress12_1_rest(i,j,iblk)-stress12_1(i,j,iblk))*ctime
+               stress12_2(i,j,iblk) = stress12_2_rest(i,j,iblk) !&
+                       !+ (stress12_2_rest(i,j,iblk)-stress12_2(i,j,iblk))*ctime
+               stress12_3(i,j,iblk) = stress12_3_rest(i,j,iblk) !&
+                       !+ (stress12_3_rest(i,j,iblk)-stress12_3(i,j,iblk))*ctime
+               stress12_4(i,j,iblk) = stress12_4_rest(i,j,iblk) !&
+                       !+ (stress12_4_rest(i,j,iblk)-stress12_4(i,j,iblk))*ctime
+               iceUmask(i,j,iblk) = iceumask_rest(i,j,iblk)!&
+                       !+ (iceumask_rest(i,j,iblk)-iceUmask(i,j,iblk))*ctime
+               frz_onset(i,j,iblk) = frz_onset_rest(i,j,iblk) !&
+                       !+ (frz_onset_rest(i,j,iblk)-frz_onset(i,j,iblk))*ctime
+               fsnow(i,j,iblk) = fsnow_rest(i,j,iblk) !&
+                       !+ (fsnow_rest(i,j,iblk)-fsnow(i,j,iblk))*ctime
+               sst(i,j,iblk) = sst_rest(i,j,iblk) !&
+                       !+ (sst_rest(i,j,iblk)-sst(i,j,iblk))*ctime
+               frzmlt(i,j,iblk) = frzmelt_rest(i,j,iblk) !&
+                       !+ (frzmelt_rest(i,j,iblk)-frzmlt(i,j,iblk))*ctime
             enddo
             enddo
          endif ! ew_boundary_type
       endif ! this_block%iblock == nblocks_x
       if (this_block%jblock == 1) then              ! south edge
          if (trim(ns_boundary_type) /= 'cyclic') then
-            do j = jlo, jlo+nfact !1->jlo test ims
+            do j = 1, jlo+nfact
             do i = 1, nx_block
             do n = 1, ncat
-               dhsn(i,j,n,iblk) = dhsn(i,j,n,iblk) &
-                      + (dhs_bry(i,j,n,iblk)-dhsn(i,j,n,iblk))*ctime
-               ffracn(i,j,n,iblk) = ffracn(i,j,n,iblk) &
-                       + (ffrac_bry(i,j,n,iblk)-ffracn(i,j,n,iblk))*ctime
-               aicen(i,j,n,iblk) = aicen(i,j,n,iblk) &
-                  + (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
-               vicen(i,j,n,iblk) = vicen(i,j,n,iblk) &
-                  + (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
-               vsnon(i,j,n,iblk) = vsnon(i,j,n,iblk) &
-                  + (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
+               aicen(i,j,n,iblk) = aicen_rest(i,j,n,iblk) !&
+                  !+ (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
+               vicen(i,j,n,iblk) = vicen_rest(i,j,n,iblk) !&
+                  !+ (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
+               vsnon(i,j,n,iblk) = vsnon_rest(i,j,n,iblk) !&
+                  !+ (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
+               dhsn(i,j,n,iblk) = dhs_rest(i,j,n,iblk) !&
+                      !+ (dhs_rest(i,j,n,iblk)-dhsn(i,j,n,iblk))*ctime
+               ffracn(i,j,n,iblk) = ffrac_rest(i,j,n,iblk) !&
+                       !+ (ffrac_rest(i,j,n,iblk)-ffracn(i,j,n,iblk))*ctime
                do nt = 1, ntrcr
-                  trcrn(i,j,nt,n,iblk) = trcrn(i,j,nt,n,iblk) &
-                     + (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
+                  trcrn(i,j,nt,n,iblk) = trcrn_rest(i,j,nt,n,iblk) !&
+                     !+ (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
                enddo
             enddo
-               uvel(i,j,iblk) = uvel(i,j,iblk) &
-                       + (uvel_bry(i,j,iblk)-uvel(i,j,iblk))*ctime
-               vvel(i,j,iblk) = vvel(i,j,iblk) &
-                       + (vvel_bry(i,j,iblk)-vvel(i,j,iblk))*ctime
-               scale_factor(i,j,iblk) = scale_factor(i,j,iblk) &
-                       + (scale_factor_bry(i,j,iblk)-scale_factor(i,j,iblk))*ctime
-               swvdr(i,j,iblk) = swvdr(i,j,iblk) &
-                       + (swvdr_bry(i,j,iblk)-swvdr(i,j,iblk))*ctime
-               swvdf(i,j,iblk) = swvdf(i,j,iblk) &
-                       + (swvdf_bry(i,j,iblk)-swvdf(i,j,iblk))*ctime
-               swidr(i,j,iblk) = swidr(i,j,iblk) &
-                       + (swidr_bry(i,j,iblk)-swidr(i,j,iblk))*ctime
-               swidf(i,j,iblk) = swidf(i,j,iblk) &
-                       + (swidf_bry(i,j,iblk)-swidf(i,j,iblk))*ctime
-               strocnxT_iavg(i,j,iblk) = strocnxT_iavg(i,j,iblk) &
-                       + (strocnxT_bry(i,j,iblk)-strocnxT_iavg(i,j,iblk))*ctime
-               strocnyT_iavg(i,j,iblk) = strocnyT_iavg(i,j,iblk) &
-                       + (strocnyT_bry(i,j,iblk)-strocnyT_iavg(i,j,iblk))*ctime
-               stressp_1(i,j,iblk) = stressp_1(i,j,iblk) &
-                       + (stressp_1_bry(i,j,iblk)-stressp_1(i,j,iblk))*ctime
-               stressp_2(i,j,iblk) = stressp_2(i,j,iblk) &
-                       + (stressp_2_bry(i,j,iblk)-stressp_2(i,j,iblk))*ctime
-               stressp_3(i,j,iblk) = stressp_3(i,j,iblk) &
-                       + (stressp_3_bry(i,j,iblk)-stressp_3(i,j,iblk))*ctime
-               stressp_4(i,j,iblk) = stressp_4(i,j,iblk) &
-                       + (stressp_4_bry(i,j,iblk)-stressp_4(i,j,iblk))*ctime
-               stressm_1(i,j,iblk) = stressm_1(i,j,iblk) &
-                       + (stressm_1_bry(i,j,iblk)-stressm_1(i,j,iblk))*ctime
-               stressm_2(i,j,iblk) = stressm_2(i,j,iblk) &
-                       + (stressm_2_bry(i,j,iblk)-stressm_2(i,j,iblk))*ctime
-               stressm_3(i,j,iblk) = stressm_3(i,j,iblk) &
-                       + (stressm_3_bry(i,j,iblk)-stressm_3(i,j,iblk))*ctime
-               stressm_4(i,j,iblk) = stressm_4(i,j,iblk) &
-                       + (stressm_4_bry(i,j,iblk)-stressm_4(i,j,iblk))*ctime
-               stress12_1(i,j,iblk) = stress12_1(i,j,iblk) &
-                       + (stress12_1_bry(i,j,iblk)-stress12_1(i,j,iblk))*ctime
-               stress12_2(i,j,iblk) = stress12_2(i,j,iblk) &
-                       + (stress12_2_bry(i,j,iblk)-stress12_2(i,j,iblk))*ctime
-               stress12_3(i,j,iblk) = stress12_3(i,j,iblk) &
-                       + (stress12_3_bry(i,j,iblk)-stress12_3(i,j,iblk))*ctime
-               stress12_4(i,j,iblk) = stress12_4(i,j,iblk) &
-                       + (stress12_4_bry(i,j,iblk)-stress12_4(i,j,iblk))*ctime
-               iceUmask(i,j,iblk) = iceUmask(i,j,iblk) &
-                       + (iceumask_bry(i,j,iblk)-iceUmask(i,j,iblk))*ctime
-               frz_onset(i,j,iblk) = frz_onset(i,j,iblk) &
-                       + (frz_onset_bry(i,j,iblk)-frz_onset(i,j,iblk))*ctime
-               fsnow(i,j,iblk) = fsnow(i,j,iblk) &
-                       + (fsnow_bry(i,j,iblk)-fsnow(i,j,iblk))*ctime
-               sst(i,j,iblk) = sst(i,j,iblk) &
-                       + (sst_bry(i,j,iblk)-sst(i,j,iblk))*ctime
-               frzmlt(i,j,iblk) = frzmlt(i,j,iblk) &
-                       + (frzmelt_bry(i,j,iblk)-frzmlt(i,j,iblk))*ctime
+               uvel(i,j,iblk) = uvel_rest(i,j,iblk)! &
+                       !+ (uvel_rest(i,j,iblk)-uvel(i,j,iblk))*ctime
+               vvel(i,j,iblk) = vvel_rest(i,j,iblk) !&
+                       !+ (vvel_rest(i,j,iblk)-vvel(i,j,iblk))*ctime
+               scale_factor(i,j,iblk) = scale_factor_rest(i,j,iblk) !&
+                       !+ (scale_factor_rest(i,j,iblk)-scale_factor(i,j,iblk))*ctime
+               swvdr(i,j,iblk) = swvdr_rest(i,j,iblk) !&
+                       !+ (swvdr_rest(i,j,iblk)-swvdr(i,j,iblk))*ctime
+               swvdf(i,j,iblk) = swvdf_rest(i,j,iblk) !&
+                       !+ (swvdf_rest(i,j,iblk)-swvdf(i,j,iblk))*ctime
+               swidr(i,j,iblk) = swidr_rest(i,j,iblk) !&
+                       !+ (swidr_rest(i,j,iblk)-swidr(i,j,iblk))*ctime
+               swidf(i,j,iblk) = swidf_rest(i,j,iblk) !&
+                       !+ (swidf_rest(i,j,iblk)-swidf(i,j,iblk))*ctime
+               strocnxT_iavg(i,j,iblk) = strocnxT_rest(i,j,iblk) !&
+                       !+ (strocnxT_rest(i,j,iblk)-strocnxT_iavg(i,j,iblk))*ctime
+               strocnyT_iavg(i,j,iblk) = strocnyT_rest(i,j,iblk) !&
+                       !+ (strocnyT_rest(i,j,iblk)-strocnyT_iavg(i,j,iblk))*ctime
+               stressp_1(i,j,iblk) = stressp_1_rest(i,j,iblk) !&
+                       !+ (stressp_1_rest(i,j,iblk)-stressp_1(i,j,iblk))*ctime
+               stressp_2(i,j,iblk) = stressp_2_rest(i,j,iblk) !&
+                       !+ (stressp_2_rest(i,j,iblk)-stressp_2(i,j,iblk))*ctime
+               stressp_3(i,j,iblk) = stressp_3_rest(i,j,iblk) !&
+                       !+ (stressp_3_rest(i,j,iblk)-stressp_3(i,j,iblk))*ctime
+               stressp_4(i,j,iblk) = stressp_4_rest(i,j,iblk) !&
+                       !+ (stressp_4_rest(i,j,iblk)-stressp_4(i,j,iblk))*ctime
+               stressm_1(i,j,iblk) = stressm_1_rest(i,j,iblk) !&
+                       !+ (stressm_1_rest(i,j,iblk)-stressm_1(i,j,iblk))*ctime
+               stressm_2(i,j,iblk) = stressm_2_rest(i,j,iblk) !&
+                       !+ (stressm_2_rest(i,j,iblk)-stressm_2(i,j,iblk))*ctime
+               stressm_3(i,j,iblk) = stressm_3_rest(i,j,iblk) !&
+               stressm_4(i,j,iblk) = stressm_4_rest(i,j,iblk) !&
+                       !+ (stressm_4_rest(i,j,iblk)-stressm_4(i,j,iblk))*ctime
+               stress12_1(i,j,iblk) = stress12_1_rest(i,j,iblk) !&
+                       !+ (stress12_1_rest(i,j,iblk)-stress12_1(i,j,iblk))*ctime
+               stress12_2(i,j,iblk) = stress12_2_rest(i,j,iblk) !&
+                       !+ (stress12_2_rest(i,j,iblk)-stress12_2(i,j,iblk))*ctime
+               stress12_3(i,j,iblk) = stress12_3_rest(i,j,iblk) !&
+                       !+ (stress12_3_rest(i,j,iblk)-stress12_3(i,j,iblk))*ctime
+               stress12_4(i,j,iblk) = stress12_4_rest(i,j,iblk) !&
+                       !+ (stress12_4_rest(i,j,iblk)-stress12_4(i,j,iblk))*ctime
+               iceUmask(i,j,iblk) = iceumask_rest(i,j,iblk)!&
+                       !+ (iceumask_rest(i,j,iblk)-iceUmask(i,j,iblk))*ctime
+               frz_onset(i,j,iblk) = frz_onset_rest(i,j,iblk) !&
+                       !+ (frz_onset_rest(i,j,iblk)-frz_onset(i,j,iblk))*ctime
+               fsnow(i,j,iblk) = fsnow_rest(i,j,iblk) !&
+                       !+ (fsnow_rest(i,j,iblk)-fsnow(i,j,iblk))*ctime
+               sst(i,j,iblk) = sst_rest(i,j,iblk) !&
+                       !+ (sst_rest(i,j,iblk)-sst(i,j,iblk))*ctime
+               frzmlt(i,j,iblk) = frzmelt_rest(i,j,iblk) !&
+                       !+ (frzmelt_rest(i,j,iblk)-frzmlt(i,j,iblk))*ctime
             enddo
             enddo
          endif !ns_boundary_type
@@ -1553,83 +1553,82 @@ end subroutine ice_HaloRestore_getbdy
                endif
                if (npad /= 0) ibc = ibc - 1
             enddo
-            do j = jhi-nfact, jhi !ibc-> jhi test ims
+            do j = jhi-nfact, ibc
             do i = 1, nx_block
             do n = 1, ncat
-               aicen(i,j,n,iblk) = aicen(i,j,n,iblk) &
-                  + (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
-               vicen(i,j,n,iblk) = vicen(i,j,n,iblk) &
-                  + (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
-               vsnon(i,j,n,iblk) = vsnon(i,j,n,iblk) &
-                  + (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
-               dhsn(i,j,n,iblk) = dhsn(i,j,n,iblk) &
-                      + (dhs_bry(i,j,n,iblk)-dhsn(i,j,n,iblk))*ctime
-               ffracn(i,j,n,iblk) = ffracn(i,j,n,iblk) &
-                       + (ffrac_bry(i,j,n,iblk)-ffracn(i,j,n,iblk))*ctime
+               aicen(i,j,n,iblk) = aicen_rest(i,j,n,iblk) !&
+                  !+ (aicen_rest(i,j,n,iblk)-aicen(i,j,n,iblk))*ctime
+               vicen(i,j,n,iblk) = vicen_rest(i,j,n,iblk) !&
+                  !+ (vicen_rest(i,j,n,iblk)-vicen(i,j,n,iblk))*ctime
+               vsnon(i,j,n,iblk) = vsnon_rest(i,j,n,iblk) !&
+                  !+ (vsnon_rest(i,j,n,iblk)-vsnon(i,j,n,iblk))*ctime
+               dhsn(i,j,n,iblk) = dhs_rest(i,j,n,iblk) !&
+                      !+ (dhs_rest(i,j,n,iblk)-dhsn(i,j,n,iblk))*ctime
+               ffracn(i,j,n,iblk) = ffrac_rest(i,j,n,iblk) !&
+                       !+ (ffrac_rest(i,j,n,iblk)-ffracn(i,j,n,iblk))*ctime
                do nt = 1, ntrcr
-                  trcrn(i,j,nt,n,iblk) = trcrn(i,j,nt,n,iblk) &
-                     + (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
+                  trcrn(i,j,nt,n,iblk) = trcrn_rest(i,j,nt,n,iblk) !&
+                     !+ (trcrn_rest(i,j,nt,n,iblk)-trcrn(i,j,nt,n,iblk))*ctime
                enddo
             enddo
-               uvel(i,j,iblk) = uvel(i,j,iblk) &
-                       + (uvel_bry(i,j,iblk)-uvel(i,j,iblk))*ctime
-               vvel(i,j,iblk) = vvel(i,j,iblk) &
-                       + (vvel_bry(i,j,iblk)-vvel(i,j,iblk))*ctime
-               scale_factor(i,j,iblk) = scale_factor(i,j,iblk) &
-                       + (scale_factor_bry(i,j,iblk)-scale_factor(i,j,iblk))*ctime
-               swvdr(i,j,iblk) = swvdr(i,j,iblk) &
-                       + (swvdr_bry(i,j,iblk)-swvdr(i,j,iblk))*ctime
-               swvdf(i,j,iblk) = swvdf(i,j,iblk) &
-                       + (swvdf_bry(i,j,iblk)-swvdf(i,j,iblk))*ctime
-               swidr(i,j,iblk) = swidr(i,j,iblk) &
-                       + (swidr_bry(i,j,iblk)-swidr(i,j,iblk))*ctime
-               swidf(i,j,iblk) = swidf(i,j,iblk) &
-                       + (swidf_bry(i,j,iblk)-swidf(i,j,iblk))*ctime
-               strocnxT_iavg(i,j,iblk) = strocnxT_iavg(i,j,iblk) &
-                       + (strocnxT_bry(i,j,iblk)-strocnxT_iavg(i,j,iblk))*ctime
-               strocnyT_iavg(i,j,iblk) = strocnyT_iavg(i,j,iblk) &
-                       + (strocnyT_bry(i,j,iblk)-strocnyT_iavg(i,j,iblk))*ctime
-               stressp_1(i,j,iblk) = stressp_1(i,j,iblk) &
-                       + (stressp_1_bry(i,j,iblk)-stressp_1(i,j,iblk))*ctime
-               stressp_2(i,j,iblk) = stressp_2(i,j,iblk) &
-                       + (stressp_2_bry(i,j,iblk)-stressp_2(i,j,iblk))*ctime
-               stressp_3(i,j,iblk) = stressp_3(i,j,iblk) &
-                       + (stressp_3_bry(i,j,iblk)-stressp_3(i,j,iblk))*ctime
-               stressp_4(i,j,iblk) = stressp_4(i,j,iblk) &
-                       + (stressp_4_bry(i,j,iblk)-stressp_4(i,j,iblk))*ctime
-               stressm_1(i,j,iblk) = stressm_1(i,j,iblk) &
-                       + (stressm_1_bry(i,j,iblk)-stressm_1(i,j,iblk))*ctime
-               stressm_2(i,j,iblk) = stressm_2(i,j,iblk) &
-                       + (stressm_2_bry(i,j,iblk)-stressm_2(i,j,iblk))*ctime
-               stressm_3(i,j,iblk) = stressm_3(i,j,iblk) &
-                       + (stressm_3_bry(i,j,iblk)-stressm_3(i,j,iblk))*ctime
-               stressm_4(i,j,iblk) = stressm_4(i,j,iblk) &
-                       + (stressm_4_bry(i,j,iblk)-stressm_4(i,j,iblk))*ctime
-               stress12_1(i,j,iblk) = stress12_1(i,j,iblk) &
-                       + (stress12_1_bry(i,j,iblk)-stress12_1(i,j,iblk))*ctime
-               stress12_2(i,j,iblk) = stress12_2(i,j,iblk) &
-                       + (stress12_2_bry(i,j,iblk)-stress12_2(i,j,iblk))*ctime
-               stress12_3(i,j,iblk) = stress12_3(i,j,iblk) &
-                       + (stress12_3_bry(i,j,iblk)-stress12_3(i,j,iblk))*ctime
-               stress12_4(i,j,iblk) = stress12_4(i,j,iblk) &
-                       + (stress12_4_bry(i,j,iblk)-stress12_4(i,j,iblk))*ctime
-               iceUmask(i,j,iblk) = iceUmask(i,j,iblk) &
-                       + (iceumask_bry(i,j,iblk)-iceUmask(i,j,iblk))*ctime
-               frz_onset(i,j,iblk) = frz_onset(i,j,iblk) &
-                       + (frz_onset_bry(i,j,iblk)-frz_onset(i,j,iblk))*ctime
-               fsnow(i,j,iblk) = fsnow(i,j,iblk) &
-                       + (fsnow_bry(i,j,iblk)-fsnow(i,j,iblk))*ctime
-               sst(i,j,iblk) = sst(i,j,iblk) &
-                       + (sst_bry(i,j,iblk)-sst(i,j,iblk))*ctime
-               frzmlt(i,j,iblk) = frzmlt(i,j,iblk) &
-                       + (frzmelt_bry(i,j,iblk)-frzmlt(i,j,iblk))*ctime
+               uvel(i,j,iblk) = uvel_rest(i,j,iblk)! &
+                       !+ (uvel_rest(i,j,iblk)-uvel(i,j,iblk))*ctime
+               vvel(i,j,iblk) = vvel_rest(i,j,iblk) !&
+                       !+ (vvel_rest(i,j,iblk)-vvel(i,j,iblk))*ctime
+               scale_factor(i,j,iblk) = scale_factor_rest(i,j,iblk) !&
+                       !+ (scale_factor_rest(i,j,iblk)-scale_factor(i,j,iblk))*ctime
+               swvdr(i,j,iblk) = swvdr_rest(i,j,iblk) !&
+                       !+ (swvdr_rest(i,j,iblk)-swvdr(i,j,iblk))*ctime
+               swvdf(i,j,iblk) = swvdf_rest(i,j,iblk) !&
+                       !+ (swvdf_rest(i,j,iblk)-swvdf(i,j,iblk))*ctime
+               swidr(i,j,iblk) = swidr_rest(i,j,iblk) !&
+                       !+ (swidr_rest(i,j,iblk)-swidr(i,j,iblk))*ctime
+               swidf(i,j,iblk) = swidf_rest(i,j,iblk) !&
+                       !+ (swidf_rest(i,j,iblk)-swidf(i,j,iblk))*ctime
+               strocnxT_iavg(i,j,iblk) = strocnxT_rest(i,j,iblk) !&
+                       !+ (strocnxT_rest(i,j,iblk)-strocnxT_iavg(i,j,iblk))*ctime
+               strocnyT_iavg(i,j,iblk) = strocnyT_rest(i,j,iblk) !&
+                       !+ (strocnyT_rest(i,j,iblk)-strocnyT_iavg(i,j,iblk))*ctime
+               stressp_1(i,j,iblk) = stressp_1_rest(i,j,iblk) !&
+                       !+ (stressp_1_rest(i,j,iblk)-stressp_1(i,j,iblk))*ctime
+               stressp_2(i,j,iblk) = stressp_2_rest(i,j,iblk) !&
+                       !+ (stressp_2_rest(i,j,iblk)-stressp_2(i,j,iblk))*ctime
+               stressp_3(i,j,iblk) = stressp_3_rest(i,j,iblk) !&
+                       !+ (stressp_3_rest(i,j,iblk)-stressp_3(i,j,iblk))*ctime
+               stressp_4(i,j,iblk) = stressp_4_rest(i,j,iblk) !&
+                       !+ (stressp_4_rest(i,j,iblk)-stressp_4(i,j,iblk))*ctime
+               stressm_1(i,j,iblk) = stressm_1_rest(i,j,iblk) !&
+                       !+ (stressm_1_rest(i,j,iblk)-stressm_1(i,j,iblk))*ctime
+               stressm_2(i,j,iblk) = stressm_2_rest(i,j,iblk) !&
+                       !+ (stressm_2_rest(i,j,iblk)-stressm_2(i,j,iblk))*ctime
+               stressm_3(i,j,iblk) = stressm_3_rest(i,j,iblk) !&
+               stressm_4(i,j,iblk) = stressm_4_rest(i,j,iblk) !&
+                       !+ (stressm_4_rest(i,j,iblk)-stressm_4(i,j,iblk))*ctime
+               stress12_1(i,j,iblk) = stress12_1_rest(i,j,iblk) !&
+                       !+ (stress12_1_rest(i,j,iblk)-stress12_1(i,j,iblk))*ctime
+               stress12_2(i,j,iblk) = stress12_2_rest(i,j,iblk) !&
+                       !+ (stress12_2_rest(i,j,iblk)-stress12_2(i,j,iblk))*ctime
+               stress12_3(i,j,iblk) = stress12_3_rest(i,j,iblk) !&
+                       !+ (stress12_3_rest(i,j,iblk)-stress12_3(i,j,iblk))*ctime
+               stress12_4(i,j,iblk) = stress12_4_rest(i,j,iblk) !&
+                       !+ (stress12_4_rest(i,j,iblk)-stress12_4(i,j,iblk))*ctime
+               iceUmask(i,j,iblk) = iceumask_rest(i,j,iblk)!&
+                       !+ (iceumask_rest(i,j,iblk)-iceUmask(i,j,iblk))*ctime
+               frz_onset(i,j,iblk) = frz_onset_rest(i,j,iblk) !&
+                       !+ (frz_onset_rest(i,j,iblk)-frz_onset(i,j,iblk))*ctime
+               fsnow(i,j,iblk) = fsnow_rest(i,j,iblk) !&
+                       !+ (fsnow_rest(i,j,iblk)-fsnow(i,j,iblk))*ctime
+               sst(i,j,iblk) = sst_rest(i,j,iblk) !&
+                       !+ (sst_rest(i,j,iblk)-sst(i,j,iblk))*ctime
+               frzmlt(i,j,iblk) = frzmelt_rest(i,j,iblk) !&
+                       !+ (frzmelt_rest(i,j,iblk)-frzmlt(i,j,iblk))*ctime
             enddo
             enddo
          endif !ns_boundary_type
       endif !this_block%jblock == nblocks_y
    enddo !iblk
    !$OMP END PARALLEL DO
-   write(nu_diag,*) 'stressm_3 after : ',sum(stressm_3(:,:,:))
+   write(nu_diag,*) 'stressm_3 after : ',sum(uvel(2,7,:))
    !call bound_state (aicen,vicen, vsnon, ntrcr, trcrn)
    else
      do iblk = 1, nblocks
