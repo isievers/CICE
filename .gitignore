@@ -7,8 +7,9 @@ doc/build
 
 # Ignore macOS cache files
 .DS_Store
-
-
+#imke settings
+icepack
+case*
 # Ignore testsuite file/directories
 testsuite*
 caselist*
