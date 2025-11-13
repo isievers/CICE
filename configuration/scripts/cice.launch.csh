@@ -276,15 +276,14 @@ endif
 else if (${ICE_MACHCOMP} =~ boreas*) then
 if (${ICE_COMMDIR} =~ serial*) then
 cat >> ${jobfile} << EOFR
-export LD_LIBRARY_PATH=/opt/cray/pe/netcdf-hdf5parallel/4.9.0.5/intel/2022.2/lib:$LD_LIBRARY_PATH
 aprun -n 1 -N 1 -d 1 ./cice >&! \$ICE_RUNLOG_FILE
 EOFR
 else
 cat >> ${jobfile} << EOFR
-export LD_LIBRARY_PATH=/opt/cray/pe/netcdf-hdf5parallel/4.9.0.5/intel/2022.2/lib:$LD_LIBRARY_PATH
 aprun -n ${ntasks} -N ${taskpernodelimit} -d ${nthrds} ./cice >&! \$ICE_RUNLOG_FILE
 EOFR
 endif
+
 
 #=======
 else if (${ICE_MACHCOMP} =~ gaea*) then
