@@ -2493,7 +2493,6 @@
                enddo
 
             endif ! > 5x5 grid
-
          else
 
             call abort_ice(subname//' ERROR: unknown kmt_type '//trim(kmt_type), &
@@ -3081,6 +3080,7 @@
 ! author: Elizabeth C. Hunke, LANL
 
       subroutine makemask
+      use ice_domain, only:sea_ice_time_bry
 
       integer (kind=int_kind) :: &
          i, j, iblk, &
@@ -3174,6 +3174,7 @@
          do i = ilo-nghost, ihi+nghost
             if ( hm(i,j,iblk)   > p5  ) tmask  (i,j,iblk)   = .true.
             if (uvm(i,j,iblk)   > p5  ) umask  (i,j,iblk)   = .true.
+            if (sea_ice_time_bry .and. tmask  (i,j,iblk) ) umask  (i,j,iblk)   = .true.
             if (uvmCD(i,j,iblk) > c1p5) umaskCD(i,j,iblk)   = .true.
             if (npm(i,j,iblk)   > p5  ) nmask  (i,j,iblk)   = .true.
             if (epm(i,j,iblk)   > p5  ) emask  (i,j,iblk)   = .true.
